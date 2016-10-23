@@ -1,0 +1,10 @@
+[Unit]
+Description=Bluetooth Agent
+
+[Service]
+User=pi
+Type=simple
+ExecStart=/home/pi/bluetooth/bt-agent.py
+
+[Install]
+WantedBy=multi-user.target
