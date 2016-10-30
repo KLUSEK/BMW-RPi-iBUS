@@ -3,10 +3,31 @@ import dbus
 SERVICE_NAME = "org.bluez"
 ADAPTER_INTERFACE = SERVICE_NAME + ".Adapter1"
 DEVICE_INTERFACE = SERVICE_NAME + ".Device1"
+AGENT_INTERFACE = SERVICE_NAME + ".Agent1"
+
+PIN_CODE = '50233'
+
+def show_adapter_info():
+	bus = dbus.SystemBus()
+	om = dbus.Interface(bus.get_object(SERVICE_NAME, "/"), "org.freedesktop.DBus.ObjectManager")
+	objects = om.GetManagedObjects()
+	for path, interfaces in objects.iteritems():
+		if ADAPTER_INTERFACE not in interfaces:
+			continue
+
+		print(" [ %s ]" % (path))
+		props = interfaces[ADAPTER_INTERFACE]
+
+		for (key, value) in props.items():
+			if (key == "Class"):
+				print("    %s = 0x%06x" % (key, value))
+			else:
+				print("    %s = %s" % (key, value))
+		print()
 
 def get_managed_objects():
 	bus = dbus.SystemBus()
-	manager = dbus.Interface(bus.get_object("org.bluez", "/"),
+	manager = dbus.Interface(bus.get_object(SERVICE_NAME, "/"),
 				"org.freedesktop.DBus.ObjectManager")
 	return manager.GetManagedObjects()
 
@@ -45,3 +66,37 @@ def find_device_in_objects(objects, device_address, adapter_pattern=None):
 			return dbus.Interface(obj, DEVICE_INTERFACE)
 
 	raise Exception("Bluetooth device not found")
+
+def set_trusted(path):
+	bus = dbus.SystemBus()
+	props = dbus.Interface(bus.get_object(SERVICE_NAME, path), "org.freedesktop.DBus.Properties")
+	props.Set(DEVICE_INTERFACE, "Trusted", True)
+
+def dev_connect(path):
+	bus = dbus.SystemBus()
+	dev = dbus.Interface(bus.get_object(SERVICE_NAME, path), DEVICE_INTERFACE)
+	dev.Connect()
+    
+class Agent(dbus.service.Object):
+	@dbus.service.method(AGENT_INTERFACE, in_signature="os", out_signature="")
+	def AuthorizeService(self, device, uuid):
+		print("AuthorizeService (%s, %s)" % (device, uuid))
+		set_trusted(device)
+		print("Trust device (%s)" % device)
+		return
+
+	@dbus.service.method(AGENT_INTERFACE, in_signature="o", out_signature="s")
+	def RequestPinCode(self, device):
+		print("RequestPinCode (%s)" % (device))
+		set_trusted(device)
+		print("Trust device (%s)" % device)
+		return PIN_CODE
+
+	@dbus.service.method(AGENT_INTERFACE, in_signature="o", out_signature="")
+	def RequestAuthorization(self, device):
+		print("RequestAuthorization (%s)" % (device))
+		return
+
+	@dbus.service.method(AGENT_INTERFACE, in_signature="", out_signature="")
+	def Cancel(self):
+		print("Cancel")
