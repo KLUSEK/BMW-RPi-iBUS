@@ -1,29 +1,35 @@
+#!/usr/bin/python
+
 import dbus
 
 SERVICE_NAME = "org.bluez"
 ADAPTER_INTERFACE = SERVICE_NAME + ".Adapter1"
 DEVICE_INTERFACE = SERVICE_NAME + ".Device1"
 AGENT_INTERFACE = SERVICE_NAME + ".Agent1"
+MEDIACONTROL_INTERFACE = SERVICE_NAME + ".MediaControl1"
 
-PIN_CODE = '50233'
+BT_DEVICE_NAME = "BMW Multimedia System"
+BT_PIN_CODE = "50233"
 
 def show_adapter_info():
-	bus = dbus.SystemBus()
-	om = dbus.Interface(bus.get_object(SERVICE_NAME, "/"), "org.freedesktop.DBus.ObjectManager")
-	objects = om.GetManagedObjects()
-	for path, interfaces in objects.iteritems():
-		if ADAPTER_INTERFACE not in interfaces:
-			continue
+    bus = dbus.SystemBus()
+    om = dbus.Interface(bus.get_object(SERVICE_NAME, "/"), "org.freedesktop.DBus.ObjectManager")
+    objects = om.GetManagedObjects()
+    for path, interfaces in objects.iteritems():
+        if ADAPTER_INTERFACE not in interfaces:
+            continue
 
-		print(" [ %s ]" % (path))
-		props = interfaces[ADAPTER_INTERFACE]
+        print(" [ %s ]" % (path))
+        props = interfaces[ADAPTER_INTERFACE]
 
-		for (key, value) in props.items():
-			if (key == "Class"):
-				print("    %s = 0x%06x" % (key, value))
-			else:
-				print("    %s = %s" % (key, value))
-		print()
+        for (key, value) in props.items():
+            if (key == "Class"):
+                print("    %s = 0x%06x" % (key, value))
+            elif (key == "UUIDs"):
+                continue                
+            else:
+                print("    %s = %s" % (key, value))
+        print()
 
 def get_managed_objects():
 	bus = dbus.SystemBus()
@@ -90,7 +96,7 @@ class Agent(dbus.service.Object):
 		print("RequestPinCode (%s)" % (device))
 		set_trusted(device)
 		print("Trust device (%s)" % device)
-		return PIN_CODE
+		return BT_PIN_CODE
 
 	@dbus.service.method(AGENT_INTERFACE, in_signature="o", out_signature="")
 	def RequestAuthorization(self, device):
