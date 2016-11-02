@@ -59,8 +59,8 @@ def interfaces_removed(path, interfaces):
     for iface in interfaces:
         if not(iface in [ADAPTER_INTERFACE, "org.bluez.Device1"]):
             continue
-    print("Adapter removed: %s [%s] ... Terminate!" % (iface, path))
-    mainloop.quit()
+        print("Adapter removed: %s [%s] ... Terminate!" % (iface, path))
+        mainloop.quit()
 
 def player_changed(interface, changed, invalidated, path):
     iface = interface[interface.rfind(".") + 1:]
