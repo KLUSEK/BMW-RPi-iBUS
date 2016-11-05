@@ -5,19 +5,17 @@ try:
   from gi.repository import GObject
 except ImportError:
   import gobject as GObject
-import unicodedata
-import bluetooth as bt
+import bluetooth as bt_
+import ibus as ibus_
 
 bluetooth = None
-
-def strip_accents(s):
-    return ''.join(c for c in unicodedata.normalize('NFD', s)
-                  if unicodedata.category(c) != 'Mn')
-    
+ibus = None
 
 def main():
     global bluetooth
-    bluetooth = bt.Bluetooth()
+    bluetooth = bt_.BluetoothService()
+    global ibus
+    ibus = ibus_.IBUSService()
 
     try:
         mainloop = GObject.MainLoop()
@@ -28,6 +26,7 @@ def main():
         print("Unable to run the gobject main loop")
         
     bluetooth.shutdown()
+    ibus.shutdown()
     sys.exit(0)
 
 

@@ -17,7 +17,25 @@ def strip_accents(s):
     return ''.join(c for c in unicodedata.normalize('NFD', s)
                   if unicodedata.category(c) != 'Mn')
 
-class Bluetooth:
+def write_to_file(file, str):
+    full_file_path = os.path.dirname(os.path.realpath(sys.argv[0])) + "/" + file
+    try:
+        with open(full_file_path, "w") as f:
+            f.write(str)
+            return True
+        except Exception as error: 
+            print("Could not save client address to file")
+            return False
+
+def read_from_fle(file):
+    full_file_path = os.path.dirname(os.path.realpath(sys.argv[0])) + "/" + file
+    if os.path.isfile(full_file_path) and os.path.getsize(full_file_path) > 0:
+        return open(full_file_path).read()
+    else:
+        return False
+
+
+class BluetoothService:
     def __init__(self):
         # Get the system bus
         try:
@@ -87,11 +105,8 @@ class Bluetooth:
             #cmd = "pactl load-module module-loopback source=bluez_source.%s; pactl set-sink-volume 0 175%%; pactl set-port-latency-offset bluez_card.%s phone-output 13000000" % (bt_addr, bt_addr)
             os.system(cmd)
 
-            try:
-                with open(os.path.dirname(os.path.realpath(sys.argv[0])) + "/" + CLIENT_ADDR_FILE, "w") as f:
-                    f.write(bt_addr)
-            except Exception as error: 
-                print("Could not save client address to file")
+            write_to_file(CLIENT_ADDR_FILE, bt_addr)
+
 
         else:
             print("Device %s disconnected" % bt_addr)
@@ -103,7 +118,7 @@ class Bluetooth:
             if not(iface in [bluezutils.ADAPTER_INTERFACE, "org.bluez.Device1"]):
                 continue
             print("Adapter removed: %s [%s] ... Terminate!" % (iface, path))
-            mainloop.quit()
+            self.shutdown()
 
     def player_changed(self, interface, changed, invalidated, path):
         iface = interface[interface.rfind(".") + 1:]
