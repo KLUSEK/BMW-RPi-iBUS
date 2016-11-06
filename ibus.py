@@ -117,14 +117,14 @@ class IBUSService:
             # process packets data (and send to Android)
             self.process_packets(packets)
 
-    def process_packets(packets):
+    def process_packets(self, packets, index=0):
         """
         Process packets []
         """
-        
-        for packet in packets:
-            print packet
-            del(packet)
+        while index < len(packets):
+            print(packets[index].raw)
+            print(packets[index])
+            del(packets[index])
 
         return True
 
@@ -172,17 +172,17 @@ class IBUSPacket(object):
         # XOR checksum calculation
         return self.xor_checksum == self.calculate_xor_checksum()
 
-#    def __str__(self):
-#        """
-#        Human-readable string representing packet data
-#        """
-#        return "IBUSPacket\nRaw = " + self.raw + "\n"\
-#               + "Source = " + self.get_device_name(self.source_id) + "\n"\
-#               + "Destination = " + self.get_device_name(self.destination_id) + "\n"\
-#               + "Data = " + self.data.decode("hex") + "\n"
+    def __str__(self):
+        """
+        Human-readable string representing packet data
+        """
+        return "IBUSPacket\nRaw = " + self.raw + "\n"\
+               + "Source = " + self.get_device_name(self.source_id) + "\n"\
+               + "Destination = " + self.get_device_name(self.destination_id) + "\n"\
+               + "Data = " + self.data.decode("hex") + "\n"
 
     @staticmethod
-    def get_device_name(device_id):
+    def get_device_name(self, device_id):
         """
         Returns device name for provided id
         i.e. 50 - MFL Multi Functional Steering Wheel Buttons
@@ -222,11 +222,12 @@ class IBUSPacket(object):
         """
         Calculates XOR value for packet
         """
-        """
-        b_source = IBUSPacket.hex_to_bin(self.source_id)
-        b_length = IBUSPacket.hex_to_bin(self.length)
-        b_destination = IBUSPacket.hex_to_bin(self.destination_id)
-        b_data = IBUSPacket.hex_to_bin(self.data)
-        """
-        # TODO return calculated value
-        return self.xor_checksum
+        packet = [self.source_id, self.length, self.destination_id]
+        packet = packet + [self.data[i:i+2] for i in range(0, len(self.data), 2)]
+
+        checksum = int(packet[0], 16)
+        for i in range(1, len(packet)):
+            checksum = checksum ^ int(packet[i], 16)
+
+        return '{:02x}'.format(checksum)
+        # return self.xor_checksum

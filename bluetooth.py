@@ -23,9 +23,9 @@ def write_to_file(file, str):
         with open(full_file_path, "w") as f:
             f.write(str)
             return True
-        except Exception as error: 
-            print("Could not save client address to file")
-            return False
+    except Exception as error: 
+        print("Could not save client address to file")
+        return False
 
 def read_from_fle(file):
     full_file_path = os.path.dirname(os.path.realpath(sys.argv[0])) + "/" + file
