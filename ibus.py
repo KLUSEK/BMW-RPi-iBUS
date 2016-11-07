@@ -14,14 +14,13 @@ class IBUSService:
     handle = None
     parity = serial.PARITY_EVEN
     port = '/dev/ttyUSB0'
-    timeout = 1
+    timeout = 0
     thread = None
 
     def __init__(self):
         """
         Initializes bi-directional communication with IBUS adapter via USB
         """
-        
         try:
             self.handle = serial.Serial(self.port, parity=self.parity, timeout=self.timeout, stopbits=1)
             self.thread = threading.Thread(target=self.start)
@@ -117,12 +116,11 @@ class IBUSService:
             # process packets data (and send to Android)
             self.process_packets(packets)
 
-    def process_packets(self, packets, index=0):
+    def process_packets(packets, index=0):
         """
         Process packets []
         """
         while index < len(packets):
-            print(packets[index].raw)
             print(packets[index])
             del(packets[index])
 
@@ -179,7 +177,7 @@ class IBUSPacket(object):
         return "IBUSPacket\nRaw = " + self.raw + "\n"\
                + "Source = " + self.get_device_name(self.source_id) + "\n"\
                + "Destination = " + self.get_device_name(self.destination_id) + "\n"\
-               + "Data = " + self.data.decode("hex") + "\n"
+               + "Data = " + self.data + "\n"
 
     @staticmethod
     def get_device_name(self, device_id):
@@ -190,28 +188,46 @@ class IBUSPacket(object):
         device_names = {
             "00": "Broadcast",
             "18": "CDW - CDC CD-Player",
-            "30": "?????",
+            "28": "Radio Controlled Clock",
+            "30": "Check Control Module",
             "3b": "NAV Navigation/Video Module",
-            "3f": "?????",
+            "3f": "Diagnostic",
+            "40": "Remote Control Central Locking",
             "43": "Menu Screen",
-            "44": "?????",
+            "44": "Ignition, Immobiliser",
+            "46": "Central Information Display",
             "50": "MFL Multi Functional Steering Wheel Buttons",
+            "51": "Mirror Memory",
+            "5B": "Integrated Heating And Air Conditioning",
             "60": "PDC Park Distance Control",
             "68": "RAD Radio",
             "6a": "DSP Digital Sound Processor",
-            "7f": "?????",
-            "80": "IKE Instrument Kombi Electronics",
+            "72": "Seat Memory",
+            "73": "Sirius Radio",
+            "76": "CD Changer DIN size",
+            "7f": "Navigation Europe",
+            "80": "IKE Instrument Control Electronics",
+            "9b": "Mirror Memory Second",
+            "9c": "Mirror Memory Third",
+            "a0": "Rear Multi Info Display",
+            "a4": "Air Bag Module",
             "a8": "?????",
+            "B0": "Speed Recognition System",
             "bb": "TV Module",
-            "bf": "LCM Light Control Module",
+            "bf": "LCM Light Control Module / Global Broadcast Address",
             "c0": "MID Multi-Information Display Buttons",
             "c8": "TEL Telephone",
-            "d0": "Navigation Location",
+            "ca": "Assist",
+            "d0": "Navigation Location / Light Control Module ?????",
+            "da": "Seat Memory Second",
+            "e0": "Integrated Radio Information System",
             "e7": "OBC Text Bar",
-            "e8": "?????",
+            "e8": "Rain Light Sensor",
             "ed": "Lights, Wipers, Seat Memory",
             "f0": "BMB Board Monitor Buttons",
             "ff": "Broadcast",
+            "100": "Unset",
+            "101": "Unknown"
         }
         try:
             return device_names[device_id]
@@ -222,12 +238,11 @@ class IBUSPacket(object):
         """
         Calculates XOR value for packet
         """
-        packet = [self.source_id, self.length, self.destination_id]
-        packet = packet + [self.data[i:i+2] for i in range(0, len(self.data), 2)]
+        packet = [self.source_id, self.length, self.destination_id] \
+                + [self.data[i:i+2] for i in range(0, len(self.data), 2)]
 
-        checksum = int(packet[0], 16)
+        checksum = int(str(packet[0]), 16)
         for i in range(1, len(packet)):
-            checksum = checksum ^ int(packet[i], 16)
+            checksum = checksum ^ int(str(packet[i]), 16)
 
         return '{:02x}'.format(checksum)
-        # return self.xor_checksum
