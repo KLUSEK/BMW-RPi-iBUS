@@ -9,31 +9,13 @@ import dbus.mainloop.glib
 import bluezutils
 
 # Based on
-# https://github.com/pauloborges/bluez/tree/master/test
+# https://github.com/pauloborges/bluez/tree/master
 
-CLIENT_ADDR_FILE = "client"
+CLIENT_MAC = os.path.dirname(os.path.realpath(sys.argv[0])) + "/client"
 
 def strip_accents(s):
     return ''.join(c for c in unicodedata.normalize('NFD', s)
                   if unicodedata.category(c) != 'Mn')
-
-def write_to_file(file, str):
-    full_file_path = os.path.dirname(os.path.realpath(sys.argv[0])) + "/" + file
-    try:
-        with open(full_file_path, "w") as f:
-            f.write(str)
-            return True
-    except Exception as error: 
-        print("Could not save client address to file")
-        return False
-
-def read_from_fle(file):
-    full_file_path = os.path.dirname(os.path.realpath(sys.argv[0])) + "/" + file
-    if os.path.isfile(full_file_path) and os.path.getsize(full_file_path) > 0:
-        return open(full_file_path).read()
-    else:
-        return False
-
 
 class BluetoothService:
     def __init__(self):
@@ -105,8 +87,11 @@ class BluetoothService:
             #cmd = "pactl load-module module-loopback source=bluez_source.%s; pactl set-sink-volume 0 175%%; pactl set-port-latency-offset bluez_card.%s phone-output 13000000" % (bt_addr, bt_addr)
             os.system(cmd)
 
-            write_to_file(CLIENT_ADDR_FILE, bt_addr)
-
+            try:
+                with open(CLIENT_MAC, "w") as f:
+                    f.write(bt_addr.replace("_", ":"))
+            except Exception as error: 
+                print("Could not save client address to file")
 
         else:
             print("Device %s disconnected" % bt_addr)
@@ -145,6 +130,18 @@ class BluetoothService:
     #	    		print('tutaj ustawienie latency')
     #			mp = dbus.Interface(bus.get_object(BUS_NAME, path), "org.bluez.MediaPlayer1")
     #			mp.Next()
+
+    def reconnect(self):
+        if os.path.isfile(CLIENT_MAC) and os.path.getsize(CLIENT_MAC) > 0:
+            try:
+                client_mac = open(CLIENT_MAC).read()
+            except Exception as error:
+                return False
+            
+            device = bluezutils.find_device(client_mac)
+            return bluezutils.dev_connect(device.object_path)
+        else:
+            return False
 
     def shutdown(self):
         self.manager.UnregisterAgent(self.path)

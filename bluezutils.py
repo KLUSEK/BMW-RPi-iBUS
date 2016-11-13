@@ -79,9 +79,24 @@ def set_trusted(path):
 	props.Set(DEVICE_INTERFACE, "Trusted", True)
 
 def dev_connect(path):
-	bus = dbus.SystemBus()
-	dev = dbus.Interface(bus.get_object(SERVICE_NAME, path), DEVICE_INTERFACE)
-	dev.Connect()
+    try:
+        bus = dbus.SystemBus()
+        dev = dbus.Interface(bus.get_object(SERVICE_NAME, path), DEVICE_INTERFACE)
+        dev.Connect()
+        return True
+    except Exception as ex:
+        print("Unable to connect device. '{0}'".format(ex.message))
+        return False
+
+def dev_disconnect(path):
+    try:
+        bus = dbus.SystemBus()
+        dev = dbus.Interface(bus.get_object(SERVICE_NAME, path), DEVICE_INTERFACE)
+        dev.Disconnect()
+        return True
+    except Exception as ex:
+        print("Unable to disconnect device. '{0}'".format(ex.message))
+        return False
     
 class Agent(dbus.service.Object):
 	@dbus.service.method(AGENT_INTERFACE, in_signature="os", out_signature="")

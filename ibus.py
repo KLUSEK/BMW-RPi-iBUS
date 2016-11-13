@@ -1,11 +1,14 @@
-#!/usr/bin/python
+ #!/usr/bin/python
 
 import serial
 import threading
 
-
 # Base on
 # https://github.com/TrentSeed/BMW_E46_Android_RPi_IBUS_Controller
+# https://github.com/t3ddftw/DroidIBus
+
+RADIO_DISPLAY_SIZE = 12
+#30 LEN 80 1A 35 00 TEXT CS
 
 class IBUSService:
 
@@ -14,7 +17,7 @@ class IBUSService:
     handle = None
     parity = serial.PARITY_EVEN
     port = '/dev/ttyUSB0'
-    timeout = 0
+    timeout = 1
     thread = None
 
     def __init__(self):
@@ -27,7 +30,7 @@ class IBUSService:
             self.thread.daemon = True
             self.thread.start()
         except:
-            print 'Cannot access to serial port ' + self.port
+            print "Cannot access to serial port " + self.port
 
     def start(self):
         """
@@ -62,8 +65,7 @@ class IBUSService:
 
         """
         packets = []
-        hex_dump = dump.encode('hex')
-        # print "Hex Dump: " + hex_dump
+        hex_dump = dump.encode("hex")
 
         while index < len(hex_dump):
             try:
@@ -113,15 +115,18 @@ class IBUSService:
             except Exception as e:
                 print "Error processing bus dump: " + e.message
 
-            # process packets data (and send to Android)
+            # process packets data
             self.process_packets(packets)
 
+    @staticmethod
     def process_packets(packets, index=0):
         """
         Process packets []
         """
         while index < len(packets):
+            # print details of received packet
             print(packets[index])
+
             del(packets[index])
 
         return True
@@ -131,13 +136,12 @@ class IBUSService:
         Writes the provided hex packet(s) to the bus
         """
         try:
-            self.handle.write(hex_value)
+            self.handle.write(hex_value.decode("hex"))
         except Exception as e:
             print "Cannot write to IBUS: " + e.message
-            #globals.restart_services()
 
 
-class IBUSPacket(object):
+class IBUSPacket:
 
     # instance variables
     source_id = None
@@ -147,7 +151,7 @@ class IBUSPacket(object):
     xor_checksum = None
     raw = None
 
-    def __init__(self, source_id, length, destination_id, data, xor_checksum, raw=None):
+    def __init__(self, source_id, length, destination_id, data, xor_checksum=None, raw=None):
         """
         Initializes packet object
         """
@@ -155,8 +159,12 @@ class IBUSPacket(object):
         self.length = length
         self.destination_id = destination_id
         self.data = data
-        self.xor_checksum = xor_checksum
-        self.raw = raw
+        self.xor_checksum = self.calculate_xor_checksum() if xor_checksum is None else xor_checksum
+        self.raw = self.source_id + \
+                   self.length + \
+                    self.destination_id + \
+                    self.data + \
+                    self.xor_checksum if raw is None else raw
         return
 
     def is_valid(self):
@@ -180,13 +188,14 @@ class IBUSPacket(object):
                + "Data = " + self.data + "\n"
 
     @staticmethod
-    def get_device_name(self, device_id):
+    def get_device_name(device_id):
         """
         Returns device name for provided id
         i.e. 50 - MFL Multi Functional Steering Wheel Buttons
         """
         device_names = {
-            "00": "Broadcast",
+            "00": "Body Module (Broadcast)",
+            "08": "Sunroof Control",
             "18": "CDW - CDC CD-Player",
             "28": "Radio Controlled Clock",
             "30": "Check Control Module",
@@ -206,19 +215,19 @@ class IBUSPacket(object):
             "73": "Sirius Radio",
             "76": "CD Changer DIN size",
             "7f": "Navigation Europe",
-            "80": "IKE Instrument Control Electronics",
+            "80": "IKE Instrument Kombi Electronics",
             "9b": "Mirror Memory Second",
             "9c": "Mirror Memory Third",
             "a0": "Rear Multi Info Display",
             "a4": "Air Bag Module",
             "a8": "?????",
-            "B0": "Speed Recognition System",
+            "b0": "Speed Recognition System",
             "bb": "TV Module",
-            "bf": "LCM Light Control Module / Global Broadcast Address",
+            "bf": "Global Broadcast Address",
             "c0": "MID Multi-Information Display Buttons",
             "c8": "TEL Telephone",
-            "ca": "Assist",
-            "d0": "Navigation Location / Light Control Module ?????",
+            "ca": "BMW Assist",
+            "d0": "Light Control Module",
             "da": "Seat Memory Second",
             "e0": "Integrated Radio Information System",
             "e7": "OBC Text Bar",
@@ -226,9 +235,8 @@ class IBUSPacket(object):
             "ed": "Lights, Wipers, Seat Memory",
             "f0": "BMB Board Monitor Buttons",
             "ff": "Broadcast",
-            "100": "Unset",
-            "101": "Unknown"
         }
+
         try:
             return device_names[device_id]
         except KeyError:
@@ -241,8 +249,28 @@ class IBUSPacket(object):
         packet = [self.source_id, self.length, self.destination_id] \
                 + [self.data[i:i+2] for i in range(0, len(self.data), 2)]
 
-        checksum = int(str(packet[0]), 16)
-        for i in range(1, len(packet)):
-            checksum = checksum ^ int(str(packet[i]), 16)
+        checksum = 0x00
+        for i in range(0, len(packet)):
+            checksum ^= int(str(packet[i]), 16)
 
-        return '{:02x}'.format(checksum)
+        return "{:02x}".format(checksum)
+    
+class IBUSCommands:
+    def generate_display_packet(self, str):
+        """
+        C8 0A 80 23 42 32 48 65 6C 6C 6F 53
+        C8 - Telephon (sender)                  (1st byte is the Source ID)
+        0A - 10 bait length                     (2nd byte is length of the packet excluding
+                                                the first two bytes (source & length)
+        80 - RAD (radio) destination            (3rd byte is the destination ID)
+        23 - function 0x23 (printing?)          (4th byte onwards is the actual data)
+        42 - to define the layout mode
+        32 - to clear the display first
+        48 65 6C 6C 6F - Hello
+        53 - Checksume                          (Last byte is the checksum)
+        """
+        str = str[:RADIO_DISPLAY_SIZE]
+        packet = IBUSPacket(source_id="c8", length="{:02x}".format(len(str)+5), \
+                            destination_id="80", data="234232"+str.encode("hex"))
+
+        return packet.raw if packet.is_valid() else False

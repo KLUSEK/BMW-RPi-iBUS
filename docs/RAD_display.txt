@@ -1,0 +1,5 @@
+Displaying text on the Business radio is actually very easy, use function 0x23 from TEL (0xC8) to RAD (0x80) with DB1 = 0x42 to define the layout mode and DB2 set to 0x32 to clear the display first, followed by the text and checksum.								
+								
+So to display 'Hello' the command would be								
+								
+C8 0A 80 23 42 32 48 65 6C 6C 6F 53
