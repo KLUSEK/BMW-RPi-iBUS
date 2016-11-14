@@ -1,7 +1,6 @@
  #!/usr/bin/python
 
 import serial
-import threading
 
 # Base on
 # https://github.com/TrentSeed/BMW_E46_Android_RPi_IBUS_Controller
@@ -18,21 +17,29 @@ class IBUSService:
     parity = serial.PARITY_EVEN
     port = '/dev/ttyUSB0'
     timeout = 1
-    thread = None
 
-    def __init__(self):
+#    def __init__(self):
+#        """
+#        Initializes bi-directional communication with IBUS adapter via USB
+#        """
+#        try:
+#            self.handle = serial.Serial(self.port, parity=self.parity, timeout=self.timeout, stopbits=1)
+#            self.thread = threading.Thread(target=self.start)
+#            self.thread.daemon = True
+#            self.thread.start()
+#        except:
+#            print "Cannot access to serial port " + self.port
+
+    def start(self):
         """
         Initializes bi-directional communication with IBUS adapter via USB
         """
         try:
             self.handle = serial.Serial(self.port, parity=self.parity, timeout=self.timeout, stopbits=1)
-            self.thread = threading.Thread(target=self.start)
-            self.thread.daemon = True
-            self.thread.start()
         except:
             print "Cannot access to serial port " + self.port
-
-    def start(self):
+            return False
+        
         """
         Starts listen service
         """
@@ -52,7 +59,6 @@ class IBUSService:
             pass
 
         self.handle = None
-        self.thread = None
 
     def process_bus_dump(self, dump, index=0):
         """
@@ -125,13 +131,13 @@ class IBUSService:
         """
         while index < len(packets):
             # print details of received packet
-            print(packets[index])
+            # print(packets[index])
 
             del(packets[index])
 
         return True
 
-    def write_to_ibus(self, hex_value):
+    def send(self, hex_value):
         """
         Writes the provided hex packet(s) to the bus
         """
@@ -254,8 +260,16 @@ class IBUSPacket:
             checksum ^= int(str(packet[i]), 16)
 
         return "{:02x}".format(checksum)
-    
+
+
 class IBUSCommands:
+
+    ibus = None
+
+    def __init__(self, IBUSService):
+        # instance of IBUSService()
+        self.ibus = IBUSService        
+        
     def generate_display_packet(self, str):
         """
         C8 0A 80 23 42 32 48 65 6C 6C 6F 53
@@ -274,3 +288,9 @@ class IBUSCommands:
                             destination_id="80", data="234232"+str.encode("hex"))
 
         return packet.raw if packet.is_valid() else False
+    
+    def clown_nose_on(self):
+        """
+        It turns-on "clown nose" under back mirror for 3 seconds
+        """
+        self.ibus.send("3f05000c4e0179")

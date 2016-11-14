@@ -2,6 +2,7 @@
 
 import sys
 import time
+import threading
 try:
   from gi.repository import GObject
 except ImportError:
@@ -17,14 +18,20 @@ def main():
     bluetooth = bt_.BluetoothService()
     global ibus
     ibus = ibus_.IBUSService()
-    ibus.commands = ibus_.IBUSCommands()
+    
+    ibus.commands = ibus_.IBUSCommands(ibus)
+    
+    ibus.thread = threading.Thread(target=ibus.start)
+    ibus.thread.daemon = True
+    ibus.thread.start()
 
     time.sleep(15)
-    ibus.write_to_ibus("3f05000c4e01")
-    #print(ibus.commands.generate_display_packet("Hello"))
+    bluetooth.reconnect()
+    ibus.commands.clown_nose_on()
+    ibus.send("3008801a3500414243d7")
+    ibus.send(ibus.commands.generate_display_packet("CONNECTED"))
     
     
-    #bluetooth.reconnect()
     try:
         mainloop = GObject.MainLoop()
         mainloop.run()
@@ -35,6 +42,7 @@ def main():
         
     bluetooth.shutdown()
     ibus.shutdown()
+    ibus.thread = None
     sys.exit(0)
 
 
