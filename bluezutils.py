@@ -8,7 +8,7 @@ DEVICE_INTERFACE = SERVICE_NAME + ".Device1"
 AGENT_INTERFACE = SERVICE_NAME + ".Agent1"
 MEDIACONTROL_INTERFACE = SERVICE_NAME + ".MediaControl1"
 
-BT_DEVICE_NAME = "BMW Multimedia System"
+BT_DEVICE_NAME = "BMW Multimedia"
 BT_PIN_CODE = "50233"
 
 def show_adapter_info():

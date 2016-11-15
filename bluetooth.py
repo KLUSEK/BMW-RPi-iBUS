@@ -2,7 +2,6 @@
 
 import os
 import sys
-import unicodedata
 import dbus
 import dbus.service
 import dbus.mainloop.glib
@@ -13,11 +12,10 @@ import bluezutils
 
 CLIENT_MAC = os.path.dirname(os.path.realpath(sys.argv[0])) + "/client"
 
-def strip_accents(s):
-    return ''.join(c for c in unicodedata.normalize('NFD', s)
-                  if unicodedata.category(c) != 'Mn')
-
 class BluetoothService:
+    
+    player = {"status": None, "artist": None, "title": None}
+    
     def __init__(self):
         # Get the system bus
         try:
@@ -82,7 +80,9 @@ class BluetoothService:
         bt_addr = "_".join(device_path.split('/')[-1].split('_')[1:])
 
         if properties["Connected"]:
+            print("==================================")
             print("Device %s connected" % bt_addr)
+            print("==================================")
             cmd = "pactl load-module module-loopback source=bluez_source.%s; pactl set-sink-volume 0 200%%" % bt_addr
             #cmd = "pactl load-module module-loopback source=bluez_source.%s; pactl set-sink-volume 0 175%%; pactl set-port-latency-offset bluez_card.%s phone-output 13000000" % (bt_addr, bt_addr)
             os.system(cmd)
@@ -94,7 +94,9 @@ class BluetoothService:
                 print("Could not save client address to file")
 
         else:
+            print("=====================================")
             print("Device %s disconnected" % bt_addr)
+            print("=====================================")
             cmd = "for i in $(pactl list short modules | grep module-loopback | grep source=bluez_source.%s | cut -f 1); do pactl unload-module $i; done" % bt_addr
             os.system(cmd)
 
@@ -108,6 +110,8 @@ class BluetoothService:
     def player_changed(self, interface, changed, invalidated, path):
         iface = interface[interface.rfind(".") + 1:]
     #    MEDIAPLAYER_PATH = path
+        print("TUTAJJJ")
+        print(path)
 
         if iface == "MediaControl1":
             if "Connected" in changed:
@@ -115,21 +119,28 @@ class BluetoothService:
                     print("MediaControl is connected [{}] and interface [{}]".format(path, iface))
 
         if iface == "MediaPlayer1":
-            if "Track" in changed:
-                if "Artist" in changed["Track"]:
-                    print("Artist: " + strip_accents(changed["Track"]["Artist"]))
-
-            if "Track" in changed:
-                if "Title" in changed["Track"]:
-                    print("Title: " + strip_accents(changed["Track"]["Title"]))
-
             if "Status" in changed:
-                print("Status changed to: " + strip_accents(changed["Status"]))
+                    self.player["status"] = changed["Status"]
+            if "Track" in changed:
+                    self.player["artist"] = changed["Track"]["Artist"] if "Artist" in changed["Track"] else None
+                    self.player["title"] = changed["Track"]["Title"] if "Title" in changed["Track"] else None
 
     #		if changed["Status"] == 'playing':
     #	    		print('tutaj ustawienie latency')
     #			mp = dbus.Interface(bus.get_object(BUS_NAME, path), "org.bluez.MediaPlayer1")
     #			mp.Next()
+
+    def player_play(self):
+        pass
+
+    def player_pause(self):
+        pass
+    
+    def player_previous(self):
+        pass
+    
+    def player_next(self):
+        pass
 
     def reconnect(self):
         if os.path.isfile(CLIENT_MAC) and os.path.getsize(CLIENT_MAC) > 0:

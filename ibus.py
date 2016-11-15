@@ -7,7 +7,6 @@ import serial
 # https://github.com/t3ddftw/DroidIBus
 
 RADIO_DISPLAY_SIZE = 12
-#30 LEN 80 1A 35 00 TEXT CS
 
 class IBUSService:
 

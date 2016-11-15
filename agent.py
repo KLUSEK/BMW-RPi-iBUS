@@ -2,6 +2,7 @@
 
 import sys
 import time
+import unicodedata
 import threading
 try:
   from gi.repository import GObject
@@ -12,6 +13,10 @@ import ibus as ibus_
 
 bluetooth = None
 ibus = None
+
+def strip_accents(s):
+    return ''.join(c for c in unicodedata.normalize('NFD', s)
+                  if unicodedata.category(c) != 'Mn')
 
 def main():
     global bluetooth
@@ -28,18 +33,20 @@ def main():
     time.sleep(15)
     bluetooth.reconnect()
     ibus.commands.clown_nose_on()
-    ibus.send("3008801a3500414243d7")
     ibus.send(ibus.commands.generate_display_packet("CONNECTED"))
-    
+    print(bluetooth.player["status"])
     
     try:
         mainloop = GObject.MainLoop()
         mainloop.run()
+        
+        print("dziala")
     except KeyboardInterrupt:
         pass
     except:
         print("Unable to run the gobject main loop")
-        
+    
+    print("Exiting ...")
     bluetooth.shutdown()
     ibus.shutdown()
     ibus.thread = None
