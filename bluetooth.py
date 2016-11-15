@@ -15,7 +15,8 @@ CLIENT_MAC = os.path.dirname(os.path.realpath(sys.argv[0])) + "/client"
 class BluetoothService:
     
     player = {"status": None, "artist": None, "title": None}
-    
+    MediaPlayer1_object_path = None
+
     def __init__(self):
         # Get the system bus
         try:
@@ -109,9 +110,7 @@ class BluetoothService:
 
     def player_changed(self, interface, changed, invalidated, path):
         iface = interface[interface.rfind(".") + 1:]
-    #    MEDIAPLAYER_PATH = path
-        print("TUTAJJJ")
-        print(path)
+        self.MediaPlayer1_object_path = path
 
         if iface == "MediaControl1":
             if "Connected" in changed:
@@ -127,20 +126,19 @@ class BluetoothService:
 
     #		if changed["Status"] == 'playing':
     #	    		print('tutaj ustawienie latency')
-    #			mp = dbus.Interface(bus.get_object(BUS_NAME, path), "org.bluez.MediaPlayer1")
-    #			mp.Next()
 
-    def player_play(self):
-        pass
-
-    def player_pause(self):
-        pass
-    
-    def player_previous(self):
-        pass
-    
-    def player_next(self):
-        pass
+    def player_control(self, action):
+        iface = dbus.Interface(bus.get_object(bluezutils.SERVICE_NAME, self.MediaPlayer1_object_path), bluezutils.MEDIACONTROL_INTERFACE)
+        if action == "play":
+            iface.Play()
+        elif action == "pause":
+            iface.Pause()
+        elif action == "previous":
+            iface.Previous()
+        elif action == "next":
+            iface.Next()
+        else:
+            return False
 
     def reconnect(self):
         if os.path.isfile(CLIENT_MAC) and os.path.getsize(CLIENT_MAC) > 0:

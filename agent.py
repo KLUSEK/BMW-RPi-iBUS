@@ -39,14 +39,12 @@ def main():
     try:
         mainloop = GObject.MainLoop()
         mainloop.run()
-        
-        print("dziala")
     except KeyboardInterrupt:
         pass
     except:
         print("Unable to run the gobject main loop")
     
-    print("Exiting ...")
+    print("\n")
     bluetooth.shutdown()
     ibus.shutdown()
     ibus.thread = None
