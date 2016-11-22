@@ -2,40 +2,88 @@
 
 import sys
 import time
-import unicodedata
 import threading
 try:
-  from gi.repository import GObject
+    from gi.repository import GObject
 except ImportError:
-  import gobject as GObject
+    import gobject as GObject
 import bluetooth as bt_
 import ibus as ibus_
 
 bluetooth = None
 ibus = None
 
-def strip_accents(s):
-    return ''.join(c for c in unicodedata.normalize('NFD', s)
-                  if unicodedata.category(c) != 'Mn')
+connected = False
+player = {"state": None, "artist": None, "title": None}
+
+def onIBUSready():
+    ibus.commands.clown_nose_on()
+    
+def onPlayerChanged(event_data):
+    global ibus
+    global player
+    
+    """
+    Wait untill all data is set
+    to avoid sending crap to CDP display
+    """
+    if ibus.handle is None or \
+        event_data["state"] is None or \
+        event_data["artist"] is None or \
+        event_data["title"] is None:
+        return
+#    if event_data["state"] is None or \
+#        event_data["artist"] is None or \
+#        event_data["title"] is None:
+#        return
+
+    """
+    Send first packet with proper icon in the begining if only state changed
+    """
+    if player["artist"] == event_data["artist"] and \
+        player["title"] == event_data["title"] and \
+        not player["state"] == event_data["state"]:
+
+        packet = ibus.commands.get_display_packet(event_data["artist"], event_data["state"])
+        ibus.send(packet.raw)
+        time.sleep(2)
+
+    """
+    Finish ongoing display thread
+    """
+    try:
+        while ibus.thread_display.isAlive():
+           ibus.commands._display_stop = True
+    except:
+        pass
+
+    """
+    Do animation in separated thread ...
+    """
+    ibus.commands._display_stop = False
+    ibus.thread_display = threading.Thread(target=ibus.commands.print_on_display, \
+                               kwargs={"data": [event_data["artist"], event_data["title"]]})
+    ibus.thread_display.daemon = True
+    ibus.thread_display.start()
+
+    player["state"] = event_data["state"]
+    player["artist"] = event_data["artist"]
+    player["title"] = event_data["title"]
 
 def main():
     global bluetooth
-    bluetooth = bt_.BluetoothService()
     global ibus
-    ibus = ibus_.IBUSService()
-    
+        
+    bluetooth = bt_.BluetoothService(onPlayerChanged)
+    ibus = ibus_.IBUSService(onIBUSready)
     ibus.commands = ibus_.IBUSCommands(ibus)
     
     ibus.thread = threading.Thread(target=ibus.start)
     ibus.thread.daemon = True
     ibus.thread.start()
 
-    time.sleep(15)
-    bluetooth.reconnect()
-    ibus.commands.clown_nose_on()
-    ibus.send(ibus.commands.generate_display_packet("CONNECTED"))
-    print(bluetooth.player["status"])
-    
+    #bluetooth.reconnect()
+
     try:
         mainloop = GObject.MainLoop()
         mainloop.run()
@@ -48,6 +96,8 @@ def main():
     bluetooth.shutdown()
     ibus.shutdown()
     ibus.thread = None
+    ibus.thread_display = None
+    ibus.commands._display_stop = True
     sys.exit(0)
 
 

@@ -6,18 +6,28 @@ import dbus
 import dbus.service
 import dbus.mainloop.glib
 import bluezutils
+import unicodedata
 
 # Based on
 # https://github.com/pauloborges/bluez/tree/master
 
 CLIENT_MAC = os.path.dirname(os.path.realpath(sys.argv[0])) + "/client"
 
-class BluetoothService:
-    
-    player = {"status": None, "artist": None, "title": None}
-    MediaPlayer1_object_path = None
+def strip_accents(s):
+    try:
+        return str(''.join(c for c in unicodedata.normalize('NFD', s)
+                  if unicodedata.category(c) != 'Mn'))
+    except:
+        return ''
 
-    def __init__(self):
+class BluetoothService(object):
+
+    bus = None
+    player = {"state": None, "artist": None, "title": None}
+
+    def __init__(self, onPlayerChanged_callback):
+        self.onPlayerChanged_callback = onPlayerChanged_callback
+        
         # Get the system bus
         try:
             dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
@@ -119,10 +129,17 @@ class BluetoothService:
 
         if iface == "MediaPlayer1":
             if "Status" in changed:
-                    self.player["status"] = changed["Status"]
+                self.player["state"] = strip_accents(changed["Status"])
+
+                # call the callback
+                self.onPlayerChanged_callback(self.player)
+            
             if "Track" in changed:
-                    self.player["artist"] = changed["Track"]["Artist"] if "Artist" in changed["Track"] else None
-                    self.player["title"] = changed["Track"]["Title"] if "Title" in changed["Track"] else None
+                self.player["artist"] = strip_accents(changed["Track"]["Artist"]).title() if "Artist" in changed["Track"] else None
+                self.player["title"] = strip_accents(changed["Track"]["Title"]).title() if "Title" in changed["Track"] else None
+                    
+                # call the callback
+                self.onPlayerChanged_callback(self.player)
 
     #		if changed["Status"] == 'playing':
     #	    		print('tutaj ustawienie latency')

@@ -1,5 +1,6 @@
  #!/usr/bin/python
 
+import time
 import serial
 
 # Base on
@@ -8,26 +9,27 @@ import serial
 
 RADIO_DISPLAY_SIZE = 12
 
-class IBUSService:
+class IBUSService(object):
 
     # configuration
     baudrate = 9600
-    handle = None
+    _handle = None
     parity = serial.PARITY_EVEN
-    port = '/dev/ttyUSB0'
+    port = "/dev/ttyUSB0"
     timeout = 1
 
-#    def __init__(self):
-#        """
-#        Initializes bi-directional communication with IBUS adapter via USB
-#        """
-#        try:
-#            self.handle = serial.Serial(self.port, parity=self.parity, timeout=self.timeout, stopbits=1)
-#            self.thread = threading.Thread(target=self.start)
-#            self.thread.daemon = True
-#            self.thread.start()
-#        except:
-#            print "Cannot access to serial port " + self.port
+    @property
+    def handle(self):
+        return self._handle
+
+    @handle.setter
+    def handle(self, value):
+        self._handle = value
+        if value is not None:
+            self.onIBUSready_callback()
+        
+    def __init__(self, onIBUSready_callback):
+        self.onIBUSready_callback = onIBUSready_callback
 
     def start(self):
         """
@@ -119,6 +121,7 @@ class IBUSService:
 
             except Exception as e:
                 print "Error processing bus dump: " + e.message
+                print "Dump: " + hex_dump
 
             # process packets data
             self.process_packets(packets)
@@ -146,7 +149,7 @@ class IBUSService:
             print "Cannot write to IBUS: " + e.message
 
 
-class IBUSPacket:
+class IBUSPacket(object):
 
     # instance variables
     source_id = None
@@ -261,15 +264,16 @@ class IBUSPacket:
         return "{:02x}".format(checksum)
 
 
-class IBUSCommands:
+class IBUSCommands(object):
 
     ibus = None
 
     def __init__(self, IBUSService):
         # instance of IBUSService()
-        self.ibus = IBUSService        
+        self.ibus = IBUSService
+        self._display_stop = False
         
-    def generate_display_packet(self, str):
+    def get_display_packet(self, str=None, state=None):
         """
         C8 0A 80 23 42 32 48 65 6C 6C 6F 53
         C8 - Telephon (sender)                  (1st byte is the Source ID)
@@ -280,13 +284,42 @@ class IBUSCommands:
         42 - to define the layout mode
         32 - to clear the display first
         48 65 6C 6C 6F - Hello
-        53 - Checksume                          (Last byte is the checksum)
+        53 - Checksum                           (Last byte is the checksum)
         """
-        str = str[:RADIO_DISPLAY_SIZE]
-        packet = IBUSPacket(source_id="c8", length="{:02x}".format(len(str)+5), \
-                            destination_id="80", data="234232"+str.encode("hex"))
+        if state is None:
+            str = str[:RADIO_DISPLAY_SIZE]
+            length = "{:02x}".format(len(str)+5)
+            data = str.encode("hex")
+        else:
+            str = str[:RADIO_DISPLAY_SIZE-2]
+            length = "{:02x}".format(len(str)+7)
+            if state == "connecting":
+                data = "c8"
+            elif state == "playing":
+                data = "bc"
+            else:
+                data = "be"
+            data += "20" + str.encode("hex")
 
-        return packet.raw if packet.is_valid() else False
+        packet = IBUSPacket(source_id="c8", length=length, destination_id="80", data="234232" + data)
+        return packet if packet.is_valid() else False
+    
+    def print_on_display(self, data=[]):
+        for str in data:
+            if self._display_stop:
+                return
+            packet = self.get_display_packet(str)
+            self.ibus.send(packet.raw)
+            time.sleep(2)
+            for i in range(1, len(str)-RADIO_DISPLAY_SIZE+1):
+                packet = self.get_display_packet(str[i:])
+                self.ibus.send(packet.raw)
+                time.sleep(.3)
+                if self._display_stop:
+                    return
+            time.sleep(2)
+
+        self.print_on_display(data)
     
     def clown_nose_on(self):
         """
