@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 import sys
-import time
 import threading
 try:
     from gi.repository import GObject
@@ -18,7 +17,10 @@ player = {"state": None, "artist": None, "title": None}
 
 def onIBUSready():
     ibus.commands.clown_nose_on()
-    
+
+def onIBUSpacket():
+    pass
+
 def onPlayerChanged(event_data):
     global ibus
     global player
@@ -46,7 +48,6 @@ def onPlayerChanged(event_data):
 
         packet = ibus.commands.get_display_packet(event_data["artist"], event_data["state"])
         ibus.send(packet.raw)
-        time.sleep(2)
 
     """
     Finish ongoing display thread

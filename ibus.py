@@ -134,7 +134,6 @@ class IBUSService(object):
         while index < len(packets):
             # print details of received packet
             # print(packets[index])
-
             del(packets[index])
 
         return True
@@ -305,21 +304,30 @@ class IBUSCommands(object):
         return packet if packet.is_valid() else False
     
     def print_on_display(self, data=[]):
-        for str in data:
+
+        for i in range(0, 5):
+            time.sleep(.5)
             if self._display_stop:
                 return
-            packet = self.get_display_packet(str)
-            self.ibus.send(packet.raw)
-            time.sleep(2)
-            for i in range(1, len(str)-RADIO_DISPLAY_SIZE+1):
-                packet = self.get_display_packet(str[i:])
-                self.ibus.send(packet.raw)
-                time.sleep(.3)
-                if self._display_stop:
-                    return
-            time.sleep(2)
 
-        self.print_on_display(data)
+        packet = self.get_display_packet(data[0])
+        self.ibus.send(packet.raw)
+
+        for i in range(0, 5):
+            time.sleep(.5)
+            if self._display_stop:
+                return
+        
+        for i in range(1, len(data[0])-RADIO_DISPLAY_SIZE+1):
+            packet = self.get_display_packet(data[0][i:])
+            self.ibus.send(packet.raw)
+
+            time.sleep(.25)        
+            if self._display_stop:
+                return
+
+        # invert the list
+        self.print_on_display(data[::-1])
     
     def clown_nose_on(self):
         """
