@@ -28,8 +28,9 @@ class IBUSService(object):
         if value is not None:
             self.onIBUSready_callback()
         
-    def __init__(self, onIBUSready_callback):
+    def __init__(self, onIBUSready_callback, onIBUSpacket_callback):
         self.onIBUSready_callback = onIBUSready_callback
+        self.onIBUSpacket_callback = onIBUSpacket_callback
 
     def start(self):
         """
@@ -126,14 +127,17 @@ class IBUSService(object):
             # process packets data
             self.process_packets(packets)
 
-    @staticmethod
-    def process_packets(packets, index=0):
+#    @staticmethod
+    def process_packets(self, packets, index=0):
         """
         Process packets []
         """
         while index < len(packets):
             # print details of received packet
             # print(packets[index])
+            
+            # call the callback
+            self.onIBUSpacket_callback(packets[index])
             del(packets[index])
 
         return True
@@ -294,6 +298,8 @@ class IBUSCommands(object):
             length = "{:02x}".format(len(str)+7)
             if state == "connecting":
                 data = "c8"
+            elif state == "mute":
+            	data = "c6"
             elif state == "playing":
                 data = "bc"
             else:

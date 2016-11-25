@@ -11,21 +11,22 @@ import unicodedata
 # Based on
 # https://github.com/pauloborges/bluez/tree/master
 
-CLIENT_MAC = os.path.dirname(os.path.realpath(sys.argv[0])) + "/client"
+CLIENT_MAC = os.path.dirname(os.path.realpath(sys.argv[0])) + "/.client"
 
 def strip_accents(s):
     try:
-        return str(''.join(c for c in unicodedata.normalize('NFD', s)
-                  if unicodedata.category(c) != 'Mn'))
+        return str("".join(c for c in unicodedata.normalize("NFD", s)
+                  if unicodedata.category(c) != "Mn"))
     except:
-        return ''
+        return "??????"
 
 class BluetoothService(object):
 
     bus = None
     player = {"state": None, "artist": None, "title": None}
 
-    def __init__(self, onPlayerChanged_callback):
+    def __init__(self, onBluetoothConnected_callback, onPlayerChanged_callback):
+        self.onBluetoothConnected_callback = onBluetoothConnected_callback
         self.onPlayerChanged_callback = onPlayerChanged_callback
         
         # Get the system bus
@@ -98,18 +99,21 @@ class BluetoothService(object):
             #cmd = "pactl load-module module-loopback source=bluez_source.%s; pactl set-sink-volume 0 175%%; pactl set-port-latency-offset bluez_card.%s phone-output 13000000" % (bt_addr, bt_addr)
             os.system(cmd)
 
+            self.onBluetoothConnected_callback(True)
+
             try:
                 with open(CLIENT_MAC, "w") as f:
                     f.write(bt_addr.replace("_", ":"))
             except Exception as error: 
                 print("Could not save client address to file")
-
         else:
             print("=====================================")
             print("Device %s disconnected" % bt_addr)
             print("=====================================")
             cmd = "for i in $(pactl list short modules | grep module-loopback | grep source=bluez_source.%s | cut -f 1); do pactl unload-module $i; done" % bt_addr
             os.system(cmd)
+            
+            self.onBluetoothConnected_callback(False)
 
     def interfaces_removed(self, path, interfaces):
         for iface in interfaces:
@@ -122,10 +126,10 @@ class BluetoothService(object):
         iface = interface[interface.rfind(".") + 1:]
         self.MediaPlayer1_object_path = path
 
-        if iface == "MediaControl1":
-            if "Connected" in changed:
-                if changed["Connected"]:
-                    print("MediaControl is connected [{}] and interface [{}]".format(path, iface))
+#        if iface == "MediaControl1":
+#            if "Connected" in changed:
+#                if changed["Connected"]:
+#                    print("MediaControl is connected [{}] and interface [{}]".format(path, iface))
 
         if iface == "MediaPlayer1":
             if "Status" in changed:
@@ -145,12 +149,12 @@ class BluetoothService(object):
     #	    		print('tutaj ustawienie latency')
 
     def player_control(self, action):
-        iface = dbus.Interface(bus.get_object(bluezutils.SERVICE_NAME, self.MediaPlayer1_object_path), bluezutils.MEDIACONTROL_INTERFACE)
+        iface = dbus.Interface(self.bus.get_object(bluezutils.SERVICE_NAME, self.MediaPlayer1_object_path), bluezutils.MEDIAPLAYER_INTERFACE)
         if action == "play":
             iface.Play()
         elif action == "pause":
             iface.Pause()
-        elif action == "previous":
+        elif action == "prev":
             iface.Previous()
         elif action == "next":
             iface.Next()
