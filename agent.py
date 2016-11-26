@@ -39,39 +39,37 @@ def onIBUSpacket(packet):
     if packet.raw == "5004683b2126":
         print("### Pressed: Next button")
         if connected:
-            print("###  -> Next song")
+            print("      -> Next song")
             bluetooth.player_control("next")
 
     if packet.raw == "5004c83b8027":
         print("### Pressed: DIAL button")
         if connected:
             if player["state"] == "playing":
-                print("###  -> Pause song")
+                print("      -> Pause song")
                 bluetooth.player_control("pause")
-            else:
-                print("###  -> Play song")
+            elif player["state"] == "pause":
+                print("      -> Play song")
                 bluetooth.player_control("play")
 
     if packet.raw == "5003c8019a":
         print("### Pressed: R/T button")
         if not connected:
-            print("###  -> BT Connecting")
+            print("      -> BT Connecting")
             packet = ibus.commands.get_display_packet("CONNECTING", "connecting")
             ibus.send(packet.raw)
             if not bluetooth.reconnect():
-                print("###  -> BT Error")
+                print("      -> BT Error")
                 packet = ibus.commands.get_display_packet("BT ERROR", "connecting")
                 ibus.send(packet.raw)
             else:
-                print("###  -> BT Connected")
+                print("      -> BT Connected")
                 packet = ibus.commands.get_display_packet("CONNECTED", "connecting")
                 ibus.send(packet.raw)
 
 def onPlayerChanged(event_data):
     global ibus
     global player
-    
-    print("[%s] %s - %s" % (event_data["state"], event_data["artist"], event_data["title"]))
 
     """
     Wait untill all data is set
@@ -82,6 +80,8 @@ def onPlayerChanged(event_data):
         event_data["artist"] is None or \
         event_data["title"] is None:
         return
+    
+    print("[%s] %s: %s" % (event_data["state"], event_data["artist"], event_data["title"]))
 
     """
     Send first packet with proper icon in the begining if only state changed

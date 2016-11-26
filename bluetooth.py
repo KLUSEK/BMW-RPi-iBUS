@@ -2,6 +2,7 @@
 
 import os
 import sys
+import re
 import dbus
 import dbus.service
 import dbus.mainloop.glib
@@ -18,7 +19,7 @@ def strip_accents(s):
         return str("".join(c for c in unicodedata.normalize("NFD", s)
                   if unicodedata.category(c) != "Mn"))
     except:
-        return "??????"
+        return "-----"
 
 class BluetoothService(object):
 
@@ -124,7 +125,9 @@ class BluetoothService(object):
 
     def player_changed(self, interface, changed, invalidated, path):
         iface = interface[interface.rfind(".") + 1:]
-        self.MediaPlayer1_object_path = path
+        
+        if re.match( r'.*\/player\d+', path):
+            self._player_object_path = path
 
 #        if iface == "MediaControl1":
 #            if "Connected" in changed:
@@ -149,16 +152,21 @@ class BluetoothService(object):
     #	    		print('tutaj ustawienie latency')
 
     def player_control(self, action):
-        iface = dbus.Interface(self.bus.get_object(bluezutils.SERVICE_NAME, self.MediaPlayer1_object_path), bluezutils.MEDIAPLAYER_INTERFACE)
-        if action == "play":
-            iface.Play()
-        elif action == "pause":
-            iface.Pause()
-        elif action == "prev":
-            iface.Previous()
-        elif action == "next":
-            iface.Next()
-        else:
+        iface = dbus.Interface(self.bus.get_object(bluezutils.SERVICE_NAME, self._player_object_path), bluezutils.MEDIAPLAYER_INTERFACE)
+        
+        try:
+            if action == "play":
+                iface.Play()
+            elif action == "pause":
+                iface.Pause()
+            elif action == "prev":
+                iface.Previous()
+            elif action == "next":
+                iface.Next()
+            else:
+                return False
+        except Exception as ex:
+            print("Player communicate error: '{0}'".format(ex.message))
             return False
 
     def reconnect(self):
