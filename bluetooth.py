@@ -12,17 +12,16 @@ import unicodedata
 # Based on
 # https://github.com/pauloborges/bluez/tree/master
 
-CLIENT_MAC = os.path.dirname(os.path.realpath(sys.argv[0])) + "/.client"
+LAST_DEVICE = os.path.dirname(os.path.realpath(sys.argv[0])) + "/.device"
 
 def strip_accents(s):
     try:
         return str("".join(c for c in unicodedata.normalize("NFD", s)
                   if unicodedata.category(c) != "Mn"))
     except:
-        return "-----"
+        return "- - -"
 
 class BluetoothService(object):
-
     bus = None
     player = {"state": None, "artist": None, "title": None}
 
@@ -66,7 +65,7 @@ class BluetoothService(object):
         print("Bluetooth AgentManager registered")
 
         # listen for signal of remove adapter
-        self.bus.add_signal_receiver(self.interfaces_removed, bus_name=bluezutils.SERVICE_NAME, dbus_interface="org.freedesktop.DBus.ObjectManager", signal_name="InterfacesRemoved")
+#        self.bus.add_signal_receiver(self.interfaces_removed, bus_name=bluezutils.SERVICE_NAME, dbus_interface="org.freedesktop.DBus.ObjectManager", signal_name="InterfacesRemoved")
 
         # listen for signals on the Bluez bus
         self.bus.add_signal_receiver(self.device_property_changed, bus_name=bluezutils.SERVICE_NAME, signal_name="PropertiesChanged", path_keyword="device_path", interface_keyword="interface")
@@ -78,9 +77,6 @@ class BluetoothService(object):
 
         self.manager.RequestDefaultAgent(self.path)
 
-        # remove all old loopback ever created
-        os.system("for i in $(pactl list short modules | grep module-loopback | grep source=bluez_source. | cut -f 1); do pactl unload-module $i; done")
-        
     def device_property_changed(self, property_name, value, path, interface, device_path):
         if property_name != "org.bluez.MediaControl1":
             return
@@ -90,29 +86,24 @@ class BluetoothService(object):
 
         print("Getting dbus interface for device: %s interface: %s property_name: %s" % (device_path, interface, property_name))
 
-        bt_addr = "_".join(device_path.split('/')[-1].split('_')[1:])
+        bt_addr = "_".join(device_path.split('/')[-1].split('_')[1:]).replace("_", ":")
 
         if properties["Connected"]:
             print("==================================")
             print("Device %s connected" % bt_addr)
             print("==================================")
-            cmd = "pactl load-module module-loopback source=bluez_source.%s; pactl set-sink-volume 0 200%%" % bt_addr
-            #cmd = "pactl load-module module-loopback source=bluez_source.%s; pactl set-sink-volume 0 175%%; pactl set-port-latency-offset bluez_card.%s phone-output 13000000" % (bt_addr, bt_addr)
-            os.system(cmd)
 
-            self.onBluetoothConnected_callback(True)
+            self.onBluetoothConnected_callback(True, bt_addr)
 
             try:
-                with open(CLIENT_MAC, "w") as f:
-                    f.write(bt_addr.replace("_", ":"))
+                with open(LAST_DEVICE, "w") as f:
+                    f.write(bt_addr)
             except Exception as error: 
                 print("Could not save client address to file")
         else:
             print("=====================================")
             print("Device %s disconnected" % bt_addr)
             print("=====================================")
-            cmd = "for i in $(pactl list short modules | grep module-loopback | grep source=bluez_source.%s | cut -f 1); do pactl unload-module $i; done" % bt_addr
-            os.system(cmd)
             
             self.onBluetoothConnected_callback(False)
 
@@ -125,7 +116,7 @@ class BluetoothService(object):
 
     def player_changed(self, interface, changed, invalidated, path):
         iface = interface[interface.rfind(".") + 1:]
-        
+
         if re.match( r'.*\/player\d+', path):
             self._player_object_path = path
 
@@ -148,9 +139,6 @@ class BluetoothService(object):
                 # call the callback
                 self.onPlayerChanged_callback(self.player)
 
-    #		if changed["Status"] == 'playing':
-    #	    		print('tutaj ustawienie latency')
-
     def player_control(self, action):
         iface = dbus.Interface(self.bus.get_object(bluezutils.SERVICE_NAME, self._player_object_path), bluezutils.MEDIAPLAYER_INTERFACE)
         
@@ -159,10 +147,16 @@ class BluetoothService(object):
                 iface.Play()
             elif action == "pause":
                 iface.Pause()
+            elif action == "stop":
+                iface.Stop()
             elif action == "prev":
                 iface.Previous()
             elif action == "next":
                 iface.Next()
+            elif action == "forward":
+                iface.FastForward()
+            elif action == "rewind":
+                iface.Rewind()
             else:
                 return False
         except Exception as ex:
@@ -170,13 +164,13 @@ class BluetoothService(object):
             return False
 
     def reconnect(self):
-        if os.path.isfile(CLIENT_MAC) and os.path.getsize(CLIENT_MAC) > 0:
+        if os.path.isfile(LAST_DEVICE) and os.path.getsize(LAST_DEVICE) > 0:
             try:
-                client_mac = open(CLIENT_MAC).read()
+                last_device = open(LAST_DEVICE).read()
             except Exception as error:
                 return False
             
-            device = bluezutils.find_device(client_mac)
+            device = bluezutils.find_device(last_device)
             return bluezutils.dev_connect(device.object_path)
         else:
             return False

@@ -32,6 +32,16 @@ def show_adapter_info():
                 print("    %s = %s" % (key, value))
         print()
 
+def get_adapter_address():
+    objects = get_managed_objects()
+    bus = dbus.SystemBus()
+    for path, ifaces in objects.iteritems():
+        adapter = ifaces.get(ADAPTER_INTERFACE)
+        if adapter is None:
+            continue
+        return adapter["Address"]
+    return False
+        
 def get_managed_objects():
 	bus = dbus.SystemBus()
 	manager = dbus.Interface(bus.get_object(SERVICE_NAME, "/"),

@@ -4,7 +4,7 @@ Description = BMW Agent
 [Service]
 User=pi
 Type=simple
-ExecStart=/usr/bin/python /home/pi/agent.py
+ExecStart=/usr/bin/python /home/pi/bmw/agent.py
 
 [Install]
 WantedBy=multi-user.target
