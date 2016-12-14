@@ -1,4 +1,4 @@
- #!/usr/bin/python
+#!/usr/bin/python
 
 import time
 import serial
@@ -132,8 +132,12 @@ class IBUSService(object):
                     continue
 
                 # create packet
-                packet = IBUSPacket(source_id=source_id, length=length, destination_id=destination_id,
-                                    data=data, xor_checksum=xor, raw=current_packet)
+                packet = IBUSPacket(source_id=source_id, 
+                                    length=length, 
+                                    destination_id=destination_id,
+                                    data=data, 
+                                    xor_checksum=xor, 
+                                    raw=current_packet)
 
                 # add packet if valid
                 if packet.is_valid():
@@ -324,7 +328,9 @@ class IBUSCommands(object):
                 data = "be"
             data += "20" + str.encode("hex")
 
-        packet = IBUSPacket(source_id="c8", length="{:02x}".format(length), destination_id="80", data="234232" + data)
+        packet = IBUSPacket(source_id="c8", 
+                            length="{:02x}".format(length), 
+                            destination_id="80", data="234232" + data)
         return packet if packet.is_valid() else False
     
     def print_on_display(self, data=[]):
@@ -386,7 +392,10 @@ class IBUSCommands(object):
         hour = "{:02x}".format(int(time.strftime("%H")))
         minute = "{:02x}".format(int(time.strftime("%M")))
 
-        packet = IBUSPacket(source_id="3b", length="06", destination_id="80", data="4001" + hour + minute)
+        packet = IBUSPacket(source_id="3b", 
+                            length="06", 
+                            destination_id="80", 
+                            data="4001" + hour + minute)
         self.ibus.send(packet.raw)
 
         # Date
@@ -394,7 +403,10 @@ class IBUSCommands(object):
         month = "{:02x}".format(int(time.strftime("%m")))
         year = "{:02x}".format(int(time.strftime("%y")))
 
-        packet = IBUSPacket(source_id="3b", length="07", destination_id="80", data="4002" + day + month + year)
+        packet = IBUSPacket(source_id="3b", 
+                            length="07", 
+                            destination_id="80", 
+                            data="4002" + day + month + year)
         self.ibus.send(packet.raw)
 
     def request_for_ignition(self):
@@ -412,6 +424,7 @@ class IBUSCommands(object):
         """
         IKE sensor status request
         IBUS Message: BF 03 80 12 2E
+        Contains R_Gear, Oil Presure, Handbrake etc.
         """
         self.ibus.send("bf0380122e")
         
@@ -432,22 +445,66 @@ class IBUSCommands(object):
         Byte 11 is the the days to inspection.
         """
         self.ibus.send("bf0380162a")
+        
+    def request_for_fuel_1(self):
+        self.ibus.send("3b0580410401fa")
+    
+    def reset_fuel_1(self):
+        self.ibus.send("3b0580410410eb")
+    
+    def request_for_fuel_2(self):
+        self.ibus.send("3b0580410501fb")
+    
+    def reset_fuel_2(self):
+        self.ibus.send("3b0580410510ea")
+    
+    def request_for_range(self):
+        self.ibus.send("3b0580410601f8")
+        
+    def request_for_distance(self):
+        self.ibus.send("3b0580410701f9")
+
+    def reset_distance(self):
+        self.ibus.send("3b0580410710e8")
+        
+    def request_for_limit(self):
+        self.ibus.send("3b0580410801f6")
+
+    def request_for_avg_speed(self):
+        self.ibus.send("3b0580410a01f4")
+
+    def reset_avg_speed(self):
+        self.ibus.send("3b0580410a10e5")
 
     def request_for_pdc(self):
         """
-
+        Request for PDC diagnistic data contains distance in cm
+        Example: 60 0E 3F A0 00 2A 25 27 25 FF FF FF EF 02 11 CK
+        bytes 6 - 9 contains distance data
         """
         self.ibus.send("3f03601b47")
+        
+    def set_speed_limit(speed):
+        """
+        3b 06 80 40 09 00 xx CK - speed limits set (audio signal with exceeding)
+        3b 05 80 41 09 20 CK    - speed limits on current speed set
+        """
+        packet = IBUSPacket(source_id="3b", 
+                            length="06", 
+                            destination_id="80",
+                            data="400900" + "{:02x}".format(speed))
+        self.ibus.send(packet.raw)
+        
+    def reset_speed_limit():
+        """
+        3b 05 80 41 09 08 fe - deactivate adjusted speed limit
+        """
+#        packet = IBUSPacket(source_id="3b", length="05", destination_id="80", data="410908")
+#        self.ibus.send(packet.raw)
+        self.ibus.send("3b0580410908fe")
 
     def clown_nose_on(self):
         """
         It turns-on "clown nose" under back mirror for 3 seconds
         """
         self.ibus.send("3f05000c4e0179")
-        
-"""
-3b 05 80 41 0a 10 chk - average speed delete
-3b 06 80 40 09 00 xx chk - speed limits set (audio signal with exceeding)
-3b 05 80 41 09 20 chk - speed limits on current speed set
-3b 05 80 41 09 08 chk - deactivate adjusted speed limit
-"""

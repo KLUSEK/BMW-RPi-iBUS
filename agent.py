@@ -9,7 +9,7 @@ except ImportError:
     import gobject as GObject
 import bluetooth as bt_
 import ibus as ibus_
-import rfcomm as rfcomm_
+#import rfcomm as rfcomm_
 
 bluetooth = None
 ibus = None
@@ -18,7 +18,6 @@ DATA = {
     "bluetooth": {
         "adapter": None,
         "connected": False,
-#        "last_device": None
     },
     "rfcomm": {
         "connected": False 
@@ -29,16 +28,24 @@ DATA = {
         "title": None
     },
     "obc": {
-        "ignition": False,
+        "ignition": None,
         "speed": None,
         "rpm": None,
         "outside": None,
         "coolant": None,
         "mileage": None,
+        "fuel_1": None,
+        "fuel_2": None,
+        "range": None,
+        "avg_speed": None,
         "lights": False
     },
     "pdc": {
-        "active": False
+        "active": False,
+        "sensor_1": None,
+        "sensor_2": None,
+        "sensor_3": None,
+        "sensor_4": None
     }
 }
 
@@ -50,6 +57,7 @@ def onIBUSready():
     ibus.cmd.clown_nose_on()
     ibus.cmd.request_for_mileage()
     ibus.cmd.request_for_ignition()
+    ibus.cmd.request_for_sensors()
     
 def onBluetoothConnected(state, adapter=None):
     global ibus
@@ -57,19 +65,21 @@ def onBluetoothConnected(state, adapter=None):
 
     DATA["bluetooth"]["connected"] = state
 
+    try:
+        while ibus.display_thread.isAlive():
+            ibus.cmd.print_stop()
+        ibus.cmd.print_clear()
+    except:
+        pass
+
     if state: # connected
         DATA["bluetooth"]["adapter"] = adapter
+        packet = ibus.cmd.get_display_packet("CONNECTED", "connect")
     else: # disconnected | reset adapter MAC address and stop RADIO display thread
         DATA["bluetooth"]["adapter"] = None
-        try:
-            while ibus.display_thread.isAlive():
-                ibus.cmd.print_stop()
-            ibus.cmd.print_clear()
-        except:
-            pass
-
         packet = ibus.cmd.get_display_packet("BT OFF", "connect")
-        ibus.send(packet.raw)
+    
+    ibus.send(packet.raw)
 
 def onIBUSpacket(packet):
     global DATA
@@ -133,11 +143,7 @@ def onIBUSpacket(packet):
             ibus.send(packet.raw)
             if not bluetooth.reconnect():
                 print("      -> BT Error")
-                packet = ibus.cmd.get_display_packet("BT ERROR", "connect")
-                ibus.send(packet.raw)
-            else:
-                print("      -> BT Connected")
-                packet = ibus.cmd.get_display_packet("CONNECTED", "connect")
+                packet = ibus.cmd.get_display_packet("ERROR", "connect")
                 ibus.send(packet.raw)
             return
 
@@ -145,11 +151,10 @@ def onIBUSpacket(packet):
         print("### Pressed: R/T button")
 
         ibus.cmd.clown_nose_on()
-        ibus.cmd.request_for_pdc()
-        ibus.cmd.request_for_sensors()
-        
-        ibus.send("3b0580410401fa")
-
+        ibus.cmd.request_for_distance()
+        ibus.cmd.request_for_limit()
+        ibus.cmd.request_for_fuel_1()
+        ibus.cmd.request_for_fuel_2()
         # Nothing binded yet
 
     # split hex string into list of values
@@ -172,36 +177,35 @@ def onIBUSpacket(packet):
         # Ignition status
         if data[0] == "11":
             DATA["obc"]["ignition"] = int(data[1], 16)
-            
-            print("Ignition state: %s" % data[1])
+
+            # print("Ignition state: %d" % DATA["obc"]["ignition"])
         """
         R_Gear detection
         80 0A BF 13 02 10 00 00 00 00 38 CK // in reverse
         80 0A BF 13 02 00 00 00 00 00 38 CK  // out of reverse
         """
         if data[0] == "13":
-            print "WSTECZNY!!!!!!!!!!! " + packet.data
-#            if data[2] == "10":
-#                print "WSTECZNY: ON!###########"
-#            elif data[2] == "00":
-#                print "WSTECZNY: OFF!##########"
+            if (int(data[2], 16) >> 4) == 1:
+                DATA["pdc"]["active"] == True
+            else:
+                DATA["pdc"]["active"] == False
         # Mileage
         elif data[0] == "17":
-            DATA["obc"]["mileage"] = (int(data[7], 16) * 65536) + (int(data[6], 16) * 256) + int(data[5], 16)
+            DATA["obc"]["mileage"] = (int(data[3], 16)*65536) + (int(data[2], 16)*256) + int(data[1], 16)
             
-            print("Mileage: %d" % DATA["obc"]["mileage"])
+            # print("Mileage: %d (km)" % DATA["obc"]["mileage"])
         # Speed/RPM
         elif data[0] == "18":
             DATA["obc"]["speed"] = int(data[1], 16) * 2
             DATA["obc"]["rpm"] = int(data[2], 16) * 100
-            
-            print("Speed: %d km/h, RPM: %d" % (int(data[1], 16)*2, int(data[2], 16)*100))
+
+            # print("Speed: %d km/h, RPM: %d" % (DATA["obc"]["speed"], DATA["obc"]["rpm"]))
         # Temperatures
         elif data[0] == "19":
             DATA["obc"]["outside"] = hex2int(data[1])
             DATA["obc"]["coolant"] = hex2int(data[2])
 
-            print("Outside: %d (C), Coolant: %d (C)" % (hex2int(data[1]), hex2int(data[2])))
+            # print("Outside: %d (C), Coolant: %d (C)" % (DATA["obc"]["outside"], DATA["obc"]["coolant"]))
 
         return
 
@@ -210,47 +214,56 @@ def onIBUSpacket(packet):
     * IBus Message: 80 0C FF 24 <System> 00 <Data> <CRC>
     
     Base on: https://github.com/t3ddftw/DroidIBus/blob/master/app/src/main/java/com/ibus/droidibus/ibus/systems/BroadcastSystem.java
-    """
+    https://github.com/t3ddftw/DroidIBus/blob/master/app/src/main/java/com/ibus/droidibus/ibus/systems/GFXNavigationSystem.java
+    """    
     if packet.source_id == "80" and packet.destination_id == "ff":
-#        # Fuel 1
-#        elif data[1] == "04":
-#            str = ''.join([data[2], data[3], data[4], data[5], data[6]])
-#            str = str.decode("hex")
-#            print("Fuel 1: %s" % str)
-#        # Fuel 2    
-#        elif data[1] == "05":
-#            str = ''.join([data[2], data[3], data[4], data[5], data[6]])
-#            str = str.decode("hex")
-#            print("Fuel 2: %s" % str)
-#        # range
-#        elif data[1] == "06":
-#            str = ''.join([data[2], data[3], data[4], data[5], data[6]])
-#            str = str.decode("hex")
-#            print("Range: %s" % str)
-#        # Distanse
-#        elif data[1] == "07":
-#            str = ''.join([data[2], data[3], data[4], data[5], data[6]])
-#            str = str.decode("hex")
-#            print("distanse: %s" % str)
-#        # AVG speed
-#        elif data[1] == "0a":
-#            str = ''.join([data[2], data[3], data[4], data[5], data[6]])
-#            str = str.decode("hex")
-#            print("avg speed: %s" % str) 
-#        else:
-        print("NIEZNANE dane")
-        print(packet.raw)
+        # Fuel 1
+        if data[1] == "04":
+            DATA["obc"]["fuel_1"] = float(packet.data[4:14].decode("hex"))
+            print("Fuel 1: %f" % DATA["obc"]["fuel_1"])
+        # Fuel 2    
+        elif data[1] == "05":
+            DATA["obc"]["fuel_2"] = float(packet.data[4:14].decode("hex"))
+            print("Fuel 2: %f" % DATA["obc"]["fuel_2"])
+        # Range
+        elif data[1] == "06":
+            DATA["obc"]["range"] = float(packet.data[4:14].decode("hex"))
+            print("Range: %f" % DATA["obc"]["range"])
+        # Distance
+        elif data[1] == "07":
+            print("Distance: %s" % packet.raw)
+        # Speed limit
+        elif data[1] == "08":
+            print("Limit: %s" % packet.raw)
+        # AVG speed
+        elif data[1] == "0a":
+            DATA["obc"]["avg_speed"] = float(packet.data[4:14].decode("hex"))
+            print("AVG speed: %f" % DATA["obc"]["avg_speed"])
+        else:
+            print("NIEZNANE dane")
+            print(packet.raw)
+            
+        return
  
     """
     PDC Park Distance Control
     """
-#    if packet.source_id == "60":
-#        print("###### PDC active!")
-#        ibus.send("3f03601b47")
-#        print packet.raw
-        
+    # Gong status - use it for sending DIAG request for distance
+    if packet.source_id == "60" and packet.destination_id == "80" and DATA["pdc"]["active"]:
+        ibus.cmd.request_for_pdc()
+
+    # DIAG responce from PDC cointaing information about distance for each sensor
     if packet.source_id == "60" and packet.destination_id == "3f":
-        print "PDC: " + packet.raw
+        DATA["pdc"]["sensor_1"] = int(data[2], 16)
+        DATA["pdc"]["sensor_2"] = int(data[3], 16)
+        DATA["pdc"]["sensor_3"] = int(data[4], 16)
+        DATA["pdc"]["sensor_4"] = int(data[5], 16)
+
+        print("Sensor #1: %d" % DATA["pdc"]["sensor_1"])
+        print("Sensor #2: %d" % DATA["pdc"]["sensor_2"])
+        print("Sensor #3: %d" % DATA["pdc"]["sensor_3"])
+        print("Sensor #4: %d" % DATA["pdc"]["sensor_4"])
+        print "\n"
 
 def onPlayerChanged(event_data):
     global DATA
@@ -335,18 +348,12 @@ def shutdown():
     except:
         pass
 
-    try:
-        if ibus.main_thread.isAlive():
-            print "Stopping IBUS main thread..."
-            ibus.stop()
-    except:
-        print "tutaj sie wyjebalo1"
+    if ibus.main_thread.isAlive():
+        print "Stopping IBUS main thread..."
+        ibus.stop()
 
-    try:
-        print "Destroying IBUS service..."
-        ibus.shutdown()
-    except:
-        print "tutaj sie wyjebalo2"
+    print "Destroying IBUS service..."
+    ibus.shutdown()
     bluetooth.shutdown()
 
 if __name__ == '__main__':
