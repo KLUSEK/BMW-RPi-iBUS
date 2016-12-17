@@ -55,10 +55,17 @@ def hex2int(v, nbits=7):
 
 def onIBUSready():
     ibus.cmd.clown_nose_on()
-    ibus.cmd.request_for_mileage()
+
     ibus.cmd.request_for_ignition()
+    ibus.cmd.request_for_mileage()
+    ibus.cmd.request_for_fuel_1()
+    ibus.cmd.request_for_fuel_2()
+    ibus.cmd.request_for_range()
+    ibus.cmd.request_for_distance()
+    ibus.cmd.request_for_avg_speed()
+    ibus.cmd.request_for_limit()
     ibus.cmd.request_for_sensors()
-    
+
 def onBluetoothConnected(state, adapter=None):
     global ibus
     global DATA
@@ -186,9 +193,15 @@ def onIBUSpacket(packet):
         """
         if data[0] == "13":
             if (int(data[2], 16) >> 4) == 1:
-                DATA["pdc"]["active"] == True
+                # decrease volume while reversing
+                if not DATA["pdc"]["active"]:
+                    ibus.cmd.volume_down()
+                DATA["pdc"]["active"] = True
             else:
-                DATA["pdc"]["active"] == False
+                # increase volume after reversing
+                if DATA["pdc"]["active"]:
+                    ibus.cmd.volume_up()
+                DATA["pdc"]["active"] = False
         # Mileage
         elif data[0] == "17":
             DATA["obc"]["mileage"] = (int(data[3], 16)*65536) + (int(data[2], 16)*256) + int(data[1], 16)
@@ -205,7 +218,7 @@ def onIBUSpacket(packet):
             DATA["obc"]["outside"] = hex2int(data[1])
             DATA["obc"]["coolant"] = hex2int(data[2])
 
-            # print("Outside: %d (C), Coolant: %d (C)" % (DATA["obc"]["outside"], DATA["obc"]["coolant"]))
+            print("Outside: %d (C), Coolant: %d (C)" % (DATA["obc"]["outside"], DATA["obc"]["coolant"]))
 
         return
 
@@ -219,15 +232,15 @@ def onIBUSpacket(packet):
     if packet.source_id == "80" and packet.destination_id == "ff":
         # Fuel 1
         if data[1] == "04":
-            DATA["obc"]["fuel_1"] = float(packet.data[4:14].decode("hex"))
+            DATA["obc"]["fuel_1"] = float(packet.data[4:14].lstrip("00").decode("hex"))
             print("Fuel 1: %f" % DATA["obc"]["fuel_1"])
         # Fuel 2    
         elif data[1] == "05":
-            DATA["obc"]["fuel_2"] = float(packet.data[4:14].decode("hex"))
+            DATA["obc"]["fuel_2"] = float(packet.data[4:14].lstrip("00").decode("hex"))
             print("Fuel 2: %f" % DATA["obc"]["fuel_2"])
         # Range
         elif data[1] == "06":
-            DATA["obc"]["range"] = float(packet.data[4:14].decode("hex"))
+            DATA["obc"]["range"] = float(packet.data[4:14].lstrip("00").decode("hex"))
             print("Range: %f" % DATA["obc"]["range"])
         # Distance
         elif data[1] == "07":
@@ -237,11 +250,8 @@ def onIBUSpacket(packet):
             print("Limit: %s" % packet.raw)
         # AVG speed
         elif data[1] == "0a":
-            DATA["obc"]["avg_speed"] = float(packet.data[4:14].decode("hex"))
+            DATA["obc"]["avg_speed"] = float(packet.data[4:14].lstrip("00").decode("hex"))
             print("AVG speed: %f" % DATA["obc"]["avg_speed"])
-        else:
-            print("NIEZNANE dane")
-            print(packet.raw)
             
         return
  

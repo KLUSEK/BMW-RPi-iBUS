@@ -366,6 +366,14 @@ class IBUSCommands(object):
 
     def print_stopped(self):
         return self._print_stop.isSet()
+    
+    def volume_down(self):
+        for i in range(0, 3):
+            self.ibus.send("50046832101e")
+    
+    def volume_up(self):
+        for i in range(0, 3):
+            self.ibus.send("50046832111f")
         
     def set_clock(self):
         """
