@@ -368,12 +368,14 @@ class IBUSCommands(object):
         return self._print_stop.isSet()
     
     def volume_down(self):
-        for i in range(0, 3):
+        for i in range(0, 5):
             self.ibus.send("50046832101e")
+            time.sleep(0.1)
     
     def volume_up(self):
-        for i in range(0, 3):
+        for i in range(0, 5):
             self.ibus.send("50046832111f")
+            time.sleep(0.1)
         
     def set_clock(self):
         """
@@ -476,7 +478,7 @@ class IBUSCommands(object):
         self.ibus.send("3b0580410710e8")
         
     def request_for_limit(self):
-        self.ibus.send("3b0580410801f6")
+        self.ibus.send("3b0580410901f7")
 
     def request_for_avg_speed(self):
         self.ibus.send("3b0580410a01f4")
@@ -507,9 +509,16 @@ class IBUSCommands(object):
         """
         3b 05 80 41 09 08 fe - deactivate adjusted speed limit
         """
-#        packet = IBUSPacket(source_id="3b", length="05", destination_id="80", data="410908")
-#        self.ibus.send(packet.raw)
         self.ibus.send("3b0580410908fe")
+
+    """
+    @return D0 10 80 54 *50 4E 07 72 3*0 07 DB 00 03 0C 07 00 0B 90
+    LCM IKE Vehicle data status VIN PN07723
+    Total dist 201 100 kms [124 958 mls]; SI-L 30 litres since last service
+    SI-T 11 days since last service
+    """
+    def request_for_vin(self):
+        self.ibus.send("8003d05300")
 
     def clown_nose_on(self):
         """
