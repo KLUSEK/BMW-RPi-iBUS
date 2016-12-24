@@ -31,6 +31,7 @@ DATA = {
         "vin": None,
         "ignition": None,
         "speed": None,
+        "limit": None,
         "rpm": None,
         "outside": None,
         "coolant": None,
@@ -38,8 +39,7 @@ DATA = {
         "fuel_1": None,
         "fuel_2": None,
         "range": None,
-        "avg_speed": None,
-        "lights": False
+        "avg_speed": None
     },
     "pdc": {
         "active": False,
@@ -228,11 +228,7 @@ def onIBUSpacket(packet):
             DATA["obc"]["outside"] = hex2int(data[1])
             DATA["obc"]["coolant"] = hex2int(data[2])
 
-            print("Outside: %d (C), Coolant: %d (C)" % (DATA["obc"]["outside"], DATA["obc"]["coolant"]))
-            
-        elif data[0] == "5b":
-            print("Light Status:")
-            print(packet.raw)
+            # print("Outside: %d (C), Coolant: %d (C)" % (DATA["obc"]["outside"], DATA["obc"]["coolant"]))
 
         return
 
@@ -248,36 +244,40 @@ def onIBUSpacket(packet):
         if data[1] == "04":
             try:
                 DATA["obc"]["fuel_1"] = float(packet.data[4:14].lstrip("00").decode("hex"))
+                print("Fuel 1: %f" % DATA["obc"]["fuel_1"])
             except:
                 DATA["obc"]["fuel_1"] = None
-            print("Fuel 1: %f" % DATA["obc"]["fuel_1"])
         # Fuel 2    
         elif data[1] == "05":
             try:
                 DATA["obc"]["fuel_2"] = float(packet.data[4:14].lstrip("00").decode("hex"))
+                print("Fuel 2: %f" % DATA["obc"]["fuel_2"])
             except:
                 DATA["obc"]["fuel_2"] = None
-            print("Fuel 2: %f" % DATA["obc"]["fuel_2"])
         # Range
         elif data[1] == "06":
             try:
                 DATA["obc"]["range"] = float(packet.data[4:14].lstrip("00").decode("hex"))
+                print("Range: %f" % DATA["obc"]["range"])
             except:
                 DATA["obc"]["range"] = None
-            print("Range: %f" % DATA["obc"]["range"])
         # Distance
         elif data[1] == "07":
             print("Distance: %s" % packet.raw)
         # Speed limit
         elif data[1] == "09":
-            print("Limit: %s" % packet.raw)
+            try:
+                DATA["obc"]["limit"] = float(packet.data[4:14].lstrip("00").decode("hex"))
+                print("Limit: %f" % DATA["obc"]["limit"])
+            except:
+                DATA["obc"]["limit"] = None
         # AVG speed
         elif data[1] == "0a":
             try:
                 DATA["obc"]["avg_speed"] = float(packet.data[4:14].lstrip("00").decode("hex"))
+                print("AVG speed: %f" % DATA["obc"]["avg_speed"])
             except:
                 DATA["obc"]["avg_speed"] = None
-            print("AVG speed: %f" % DATA["obc"]["avg_speed"])
             
         return
  
@@ -375,7 +375,7 @@ def main():
 def shutdown():
     global bluetooth
     global ibus
-    
+
     try:
         print "Stopping RADIO display thread..."
         while ibus.display_thread.isAlive():
