@@ -133,8 +133,8 @@ class BluetoothService(object):
                 self.onPlayerChanged_callback(self.player)
             
             if "Track" in changed:
-                self.player["artist"] = strip_accents(changed["Track"]["Artist"]).title() if "Artist" in changed["Track"] else None
-                self.player["title"] = strip_accents(changed["Track"]["Title"]).title() if "Title" in changed["Track"] else None
+                self.player["artist"] = strip_accents(changed["Track"]["Artist"]) if "Artist" in changed["Track"] else None
+                self.player["title"] = strip_accents(changed["Track"]["Title"]) if "Title" in changed["Track"] else None
                     
                 # call the callback
                 self.onPlayerChanged_callback(self.player)

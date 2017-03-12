@@ -31,15 +31,16 @@ DATA = {
         "vin": None,
         "ignition": None,
         "speed": None,
-        "limit": None,
         "rpm": None,
+        "limit": None,
         "outside": None,
         "coolant": None,
         "mileage": None,
         "fuel_1": None,
         "fuel_2": None,
         "range": None,
-        "avg_speed": None
+        "avg_speed": None,
+        "lights": False
     },
     "pdc": {
         "active": False,
@@ -47,6 +48,9 @@ DATA = {
         "sensor_2": None,
         "sensor_3": None,
         "sensor_4": None
+    },
+    "radio": {
+        "active": False
     }
 }
 
@@ -67,6 +71,7 @@ def onIBUSready():
     ibus.cmd.request_for_avg_speed()
     ibus.cmd.request_for_limit()
     ibus.cmd.request_for_sensors()
+    ibus.cmd.request_for_radio_status()
 
 def onBluetoothConnected(state, adapter=None):
     global ibus
@@ -83,7 +88,7 @@ def onBluetoothConnected(state, adapter=None):
 
     if state: # connected
         DATA["bluetooth"]["adapter"] = adapter
-        packet = ibus.cmd.get_display_packet("CONNECTED", "connect")
+        packet = ibus.cmd.get_display_packet("BT READY", "connect")
     else: # disconnected | reset adapter MAC address and stop RADIO display thread
         DATA["bluetooth"]["adapter"] = None
         packet = ibus.cmd.get_display_packet("BT OFF", "connect")
@@ -165,6 +170,7 @@ def onIBUSpacket(packet):
         ibus.cmd.request_for_limit()
         ibus.cmd.request_for_fuel_1()
         ibus.cmd.request_for_fuel_2()
+        ibus.cmd.request_for_radio_status()
         # Nothing binded yet
 
     # split hex string into list of values
@@ -173,9 +179,8 @@ def onIBUSpacket(packet):
     
     # looking for vehicle VIN
     if packet.source_id == "d0" and packet.destination_id == "80":
-        print("VIN:")
-        print(data[1].decode("hex") + data[2].decode("hex") + data[3] + data[4] + data[5])
-        
+        print("VIN: " + data[1].decode("hex") + data[2].decode("hex") + data[3] + data[4] + data[5])
+
         return
 
     """
@@ -195,7 +200,7 @@ def onIBUSpacket(packet):
         if data[0] == "11":
             DATA["obc"]["ignition"] = int(data[1], 16)
 
-            # print("Ignition state: %d" % DATA["obc"]["ignition"])
+            print("Ignition state: %d" % DATA["obc"]["ignition"])
         """
         R_Gear detection
         80 0A BF 13 02 10 00 00 00 00 38 CK // in reverse
@@ -207,28 +212,34 @@ def onIBUSpacket(packet):
                 if not DATA["pdc"]["active"]:
                     ibus.cmd.volume_down()
                 DATA["pdc"]["active"] = True
+                print("PDC active")
             else:
                 # increase volume after reversing
                 if DATA["pdc"]["active"]:
                     ibus.cmd.volume_up()
                 DATA["pdc"]["active"] = False
+                print("PDC inactive")
         # Mileage
         elif data[0] == "17":
             DATA["obc"]["mileage"] = (int(data[3], 16)*65536) + (int(data[2], 16)*256) + int(data[1], 16)
             
-            # print("Mileage: %d (km)" % DATA["obc"]["mileage"])
+            print("Mileage: %d (km)" % DATA["obc"]["mileage"])
         # Speed/RPM
         elif data[0] == "18":
             DATA["obc"]["speed"] = int(data[1], 16) * 2
             DATA["obc"]["rpm"] = int(data[2], 16) * 100
 
-            # print("Speed: %d km/h, RPM: %d" % (DATA["obc"]["speed"], DATA["obc"]["rpm"]))
+            print("Speed: %d km/h, RPM: %d" % (DATA["obc"]["speed"], DATA["obc"]["rpm"]))
         # Temperatures
         elif data[0] == "19":
             DATA["obc"]["outside"] = hex2int(data[1])
             DATA["obc"]["coolant"] = hex2int(data[2])
 
-            # print("Outside: %d (C), Coolant: %d (C)" % (DATA["obc"]["outside"], DATA["obc"]["coolant"]))
+            print("Outside: %d (C), Coolant: %d (C)" % (DATA["obc"]["outside"], DATA["obc"]["coolant"]))
+        # Lights status
+        elif data[0] == "5b":
+            print("Light Status:")
+            print(packet.raw)
 
         return
 
@@ -279,6 +290,15 @@ def onIBUSpacket(packet):
             except:
                 DATA["obc"]["avg_speed"] = None
             
+        return
+    
+    """
+    RAD Radio
+    """
+    if packet.source_id == "68" and packet.destination_id == "3f":
+        DATA["radio"]["active"] = True if data[1] == "01" else False
+        print("Radio active?")
+        print(DATA["radio"]["active"])
         return
  
     """
@@ -375,7 +395,7 @@ def main():
 def shutdown():
     global bluetooth
     global ibus
-
+    
     try:
         print "Stopping RADIO display thread..."
         while ibus.display_thread.isAlive():

@@ -519,6 +519,13 @@ class IBUSCommands(object):
     """
     def request_for_vin(self):
         self.ibus.send("8003d05300")
+    
+    """
+    @return 68 0D 3F A0 01 0D 56 20 20 30 31 30 31 34 94
+    5th bit indicates RADIO is on or not
+    """
+    def request_for_radio_status(self):
+        self.ibus.send("3f03680b5f")
 
     def clown_nose_on(self):
         """
