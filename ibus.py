@@ -1,6 +1,10 @@
 #!/usr/bin/python
 
+import sys
 import time
+import datetime
+import socket
+import struct
 import serial
 import threading
 
@@ -395,29 +399,41 @@ class IBUSCommands(object):
         1B = day in hex 
         05 = month in hex
         08 = year in hex
-        
-        time.strftime("%y-%m-%d %H:%M") '16-11-19 09:38'
         """
-        # Time
-        hour = "{:02x}".format(int(time.strftime("%H")))
-        minute = "{:02x}".format(int(time.strftime("%M")))
+        
+        client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        data = '\x1b'+47*'\0'
+        client.sendto(data, ('pl.pool.ntp.org', 123))
+        data, address = client.recvfrom(1024)
 
-        packet = IBUSPacket(source_id="3b", 
-                            length="06", 
-                            destination_id="80", 
-                            data="4001" + hour + minute)
-        self.ibus.send(packet.raw)
+        if data:
+            t = struct.unpack('!12I', data)[10]
+            t -= 2208988800L #1970
+            print time.ctime(t)
+            d = datetime.datetime.strptime(time.ctime(t), "%a %b %d %H:%M:%S %Y")
 
-        # Date
-        day = "{:02x}".format(int(time.strftime("%d")))
-        month = "{:02x}".format(int(time.strftime("%m")))
-        year = "{:02x}".format(int(time.strftime("%y")))
+            # Clock
+            hour = "{:02x}".format(int(d.hour))
+            minute = "{:02x}".format(int(d.minute))
 
-        packet = IBUSPacket(source_id="3b", 
-                            length="07", 
-                            destination_id="80", 
-                            data="4002" + day + month + year)
-        self.ibus.send(packet.raw)
+            packet = IBUSPacket(source_id="3b", 
+                                length="06", 
+                                destination_id="80", 
+                                data="4001" + hour + minute)
+            self.ibus.send(packet.raw)
+            
+            # Date
+            day = "{:02x}".format(int(d.day))
+            month = "{:02x}".format(int(d.month))
+            year = "{:02x}".format(int(d.year))
+
+            packet = IBUSPacket(source_id="3b", 
+                                length="07", 
+                                destination_id="80", 
+                                data="4002" + day + month + year)
+            self.ibus.send(packet.raw)
+        else:
+            print("Could not get time from NTP server!")
 
     def request_for_ignition(self):
         """

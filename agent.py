@@ -171,7 +171,7 @@ def onIBUSpacket(packet):
         ibus.cmd.request_for_fuel_1()
         ibus.cmd.request_for_fuel_2()
         ibus.cmd.request_for_radio_status()
-        # Nothing binded yet
+        ibus.cmd.set_clock()
 
     # split hex string into list of values
     data = []
