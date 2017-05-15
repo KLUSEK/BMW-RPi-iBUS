@@ -1,7 +1,7 @@
 # BMW-RPi-iBUS
 Multimedia computer for older BMW cars based on Raspberry Pi
 
-[![IMAGE ALT TEXT HERE](http://img.youtube.com/vi/OEMaE5pHpU/0.jpg)](http://www.youtube.com/watch?v=OEMaE5pHpU)
+[![IMAGE ALT TEXT HERE](http://img.youtube.com/vi/yOEMaE5pHpU/0.jpg)](http://www.youtube.com/watch?v=yOEMaE5pHpU)
 
 ## Python dependenties
 python-gobject
