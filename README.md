@@ -112,3 +112,11 @@ We have installed already packages called bluez & bluez-tools.
 So it's time to try communicate our system with other BT device.
 
 https://wiki.archlinux.org/index.php/bluetooth#Bluetoothctl
+
+
+### Some photos :-)
+
+![alt text](http://i.imgur.com/pkuh65Rl.jpg)
+![alt text](http://i.imgur.com/ajvKmORl.jpg)
+![alt text](http://i.imgur.com/oHVZfIJl.jpg)
+![alt text](http://i.imgur.com/gFbIz6fl.jpg)
