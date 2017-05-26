@@ -2,6 +2,7 @@
 
 import os
 import sys
+import time
 import threading
 try:
     from gi.repository import GObject
@@ -89,11 +90,18 @@ def onBluetoothConnected(state, adapter=None):
     if state: # connected
         DATA["bluetooth"]["adapter"] = adapter
         packet = ibus.cmd.get_display_packet("BT READY", "connect")
+        ibus.send(packet.raw)
+        
+        time.sleep(1.5)
+        ibus.cmd.request_for_radio_mode_switch()
+        ibus.cmd.request_for_radio_mode_switch()
     else: # disconnected | reset adapter MAC address and stop RADIO display thread
         DATA["bluetooth"]["adapter"] = None
         packet = ibus.cmd.get_display_packet("BT OFF", "connect")
-    
-    ibus.send(packet.raw)
+
+        ibus.send(packet.raw)
+        time.sleep(1.5)
+        ibus.cmd.request_for_radio_mode_switch()
 
 def onIBUSpacket(packet):
     global DATA
@@ -160,6 +168,11 @@ def onIBUSpacket(packet):
                 packet = ibus.cmd.get_display_packet("ERROR", "connect")
                 ibus.send(packet.raw)
             return
+        else:
+            print("      -> BT Disconnecting")
+            packet = ibus.cmd.get_display_packet("DISABLING", "connect")
+            ibus.send(packet.raw)
+            bluetooth.disconnect()
 
     if packet.raw == "5003c8019a":
         print("### Pressed: R/T button")
@@ -296,10 +309,11 @@ def onIBUSpacket(packet):
     RAD Radio
     """
     if packet.source_id == "68" and packet.destination_id == "3f":
-        DATA["radio"]["active"] = True if data[1] == "01" else False
-        print("Radio active?")
-        print(DATA["radio"]["active"])
-        return
+        if packet.length == "0d": 
+            DATA["radio"]["active"] = True if data[1] == "31" else False
+            print("Radio active?")
+            print(DATA["radio"]["active"])
+            return
  
     """
     PDC Park Distance Control
@@ -319,7 +333,7 @@ def onIBUSpacket(packet):
         print("Sensor #2: %d" % DATA["pdc"]["sensor_2"])
         print("Sensor #3: %d" % DATA["pdc"]["sensor_3"])
         print("Sensor #4: %d" % DATA["pdc"]["sensor_4"])
-        print ""
+        print("")
 
 def onPlayerChanged(event_data):
     global DATA
@@ -388,7 +402,7 @@ def main():
     except:
         print("Unable to run the gobject main loop")
     
-    print ''
+    print('')
     shutdown()
     sys.exit(0)
     
@@ -397,7 +411,7 @@ def shutdown():
     global ibus
     
     try:
-        print "Stopping RADIO display thread..."
+        print("Stopping RADIO display thread...")
         while ibus.display_thread.isAlive():
             ibus.cmd.print_stop()
         ibus.cmd.print_clear()
@@ -405,10 +419,10 @@ def shutdown():
         pass
 
     if ibus.main_thread.isAlive():
-        print "Stopping IBUS main thread..."
+        print("Stopping IBUS main thread...")
         ibus.stop()
 
-    print "Destroying IBUS service..."
+    print("Destroying IBUS service...")
     ibus.shutdown()
     bluetooth.shutdown()
 

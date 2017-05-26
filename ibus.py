@@ -13,6 +13,7 @@ import threading
 # https://github.com/t3ddftw/DroidIBus
 
 RADIO_DISPLAY_SIZE = 12
+NTP_SERVER = "pl.pool.ntp.org" # time server
 
 class IBUSService(object):
 
@@ -175,7 +176,7 @@ class IBUSService(object):
         try:
             self.handle.write(hex_value.decode("hex"))
         except Exception as e:
-            print "Cannot write to IBUS: " + e.message
+            print("Cannot write to IBUS: " + e.message + "\nDump: " + hex_value)
 
 
 class IBUSPacket(object):
@@ -401,39 +402,42 @@ class IBUSCommands(object):
         08 = year in hex
         """
         
-        client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        data = '\x1b'+47*'\0'
-        client.sendto(data, ('pl.pool.ntp.org', 123))
-        data, address = client.recvfrom(1024)
+        try:
+            client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            data = '\x1b' + 47 * '\0'
+            client.sendto(data, (NTP_SERVER, 123))
+            data, address = client.recvfrom(1024)
 
-        if data:
-            t = struct.unpack('!12I', data)[10]
-            t -= 2208988800L #1970
-            print time.ctime(t)
-            d = datetime.datetime.strptime(time.ctime(t), "%a %b %d %H:%M:%S %Y")
+            if data:
+                t = struct.unpack('!12I', data)[10]
+                t -= 2208988800L #1970
+                print("NTP server returned: " + time.ctime(t))
+                d = datetime.datetime.strptime(time.ctime(t), "%a %b %d %H:%M:%S %Y")
 
-            # Clock
-            hour = "{:02x}".format(int(d.hour))
-            minute = "{:02x}".format(int(d.minute))
+                # Clock
+                hour = "{:02x}".format(int(d.hour))
+                minute = "{:02x}".format(int(d.minute))
 
-            packet = IBUSPacket(source_id="3b", 
-                                length="06", 
-                                destination_id="80", 
-                                data="4001" + hour + minute)
-            self.ibus.send(packet.raw)
-            
-            # Date
-            day = "{:02x}".format(int(d.day))
-            month = "{:02x}".format(int(d.month))
-            year = "{:02x}".format(int(d.year))
+                packet = IBUSPacket(source_id="3b", 
+                                    length="06", 
+                                    destination_id="80", 
+                                    data="4001" + hour + minute)
+                self.ibus.send(packet.raw)
 
-            packet = IBUSPacket(source_id="3b", 
-                                length="07", 
-                                destination_id="80", 
-                                data="4002" + day + month + year)
-            self.ibus.send(packet.raw)
-        else:
-            print("Could not get time from NTP server!")
+                # Date
+                day = "{:02x}".format(int(d.day))
+                month = "{:02x}".format(int(d.month))
+                year = "{:02x}".format(int(str(d.year)[2:]))
+
+                packet = IBUSPacket(source_id="3b", 
+                                    length="07", 
+                                    destination_id="80", 
+                                    data="4002" + day + month + year)
+                self.ibus.send(packet.raw)
+            else:
+                print("Could not get time from NTP server: Data error.")
+        except:
+            print("Could not get time from NTP server: Connection error.")
 
     def request_for_ignition(self):
         """
@@ -527,21 +531,30 @@ class IBUSCommands(object):
         """
         self.ibus.send("3b0580410908fe")
 
-    """
-    @return D0 10 80 54 *50 4E 07 72 3*0 07 DB 00 03 0C 07 00 0B 90
-    LCM IKE Vehicle data status VIN PN07723
-    Total dist 201 100 kms [124 958 mls]; SI-L 30 litres since last service
-    SI-T 11 days since last service
-    """
     def request_for_vin(self):
+        """
+        @return D0 10 80 54 *50 4E 07 72 3*0 07 DB 00 03 0C 07 00 0B 90
+        LCM IKE Vehicle data status VIN PN07723
+        Total dist 201 100 kms [124 958 mls]; SI-L 30 litres since last service
+        SI-T 11 days since last service
+        """
         self.ibus.send("8003d05300")
-    
-    """
-    @return 68 0D 3F A0 01 0D 56 20 20 30 31 30 31 34 94
-    5th bit indicates RADIO is on or not
-    """
+
     def request_for_radio_status(self):
+        """
+        @return 68 0D 3F A0 01 0D 56 20 20 30 31 30 31 34 94
+        5th bit indicates RADIO is on or not
+        
+        68 0d 3f a0 31 0d ... - on
+        68 0d 3f a0 30 0d ... - off
+        """
         self.ibus.send("3f03680b5f")
+
+    def request_for_radio_mode_switch(self):
+        """
+        @return 68 03 3f a0 f4
+        """
+        self.ibus.send("3f04680c0956")
 
     def clown_nose_on(self):
         """
