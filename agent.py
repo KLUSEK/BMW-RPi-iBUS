@@ -172,7 +172,7 @@ def onIBUSpacket(packet):
             print("      -> BT Disconnecting")
             packet = ibus.cmd.get_display_packet("DISABLING", "connect")
             ibus.send(packet.raw)
-            bluetooth.disconnect()
+            bluetooth.disconnect(DATA["bluetooth"]["adapter"])
 
     if packet.raw == "5003c8019a":
         print("### Pressed: R/T button")
@@ -192,8 +192,12 @@ def onIBUSpacket(packet):
     
     # looking for vehicle VIN
     if packet.source_id == "d0" and packet.destination_id == "80":
-        print("VIN: " + data[1].decode("hex") + data[2].decode("hex") + data[3] + data[4] + data[5])
-
+        try:
+            DATA["obc"]["vin"] = data[1].decode("hex") + data[2].decode("hex") + data[3] + data[4] + data[5]
+            print("VIN: %s" % DATA["obc"]["vin"])
+        except:
+            DATA["obc"]["vin"] = None
+            print("VIN: unknown")
         return
 
     """
@@ -224,14 +228,20 @@ def onIBUSpacket(packet):
                 # decrease volume while reversing
                 if not DATA["pdc"]["active"]:
                     ibus.cmd.volume_down()
+                    if DATA["player"]["state"] == "playing":
+                        print("      -> Pause song")
+                        bluetooth.player_control("pause")
                 DATA["pdc"]["active"] = True
-                print("PDC active")
+                print("PDC: active")
             else:
                 # increase volume after reversing
                 if DATA["pdc"]["active"]:
+                    # 3x MODE button to reset display
+                    for i in range(0, 3):
+                        ibus.cmd.request_for_radio_mode_switch()
                     ibus.cmd.volume_up()
                 DATA["pdc"]["active"] = False
-                print("PDC inactive")
+                print("PDC: inactive")
         # Mileage
         elif data[0] == "17":
             DATA["obc"]["mileage"] = (int(data[3], 16)*65536) + (int(data[2], 16)*256) + int(data[1], 16)
@@ -325,15 +335,22 @@ def onIBUSpacket(packet):
     # DIAG responce from PDC cointaing information about distance for each sensor
     if packet.source_id == "60" and packet.destination_id == "3f":
         DATA["pdc"]["sensor_1"] = int(data[2], 16)
-        DATA["pdc"]["sensor_2"] = int(data[3], 16)
-        DATA["pdc"]["sensor_3"] = int(data[4], 16)
-        DATA["pdc"]["sensor_4"] = int(data[5], 16)
+        DATA["pdc"]["sensor_2"] = int(data[4], 16)
+        DATA["pdc"]["sensor_3"] = int(data[5], 16)
+        DATA["pdc"]["sensor_4"] = int(data[3], 16)
 
         print("Sensor #1: %d" % DATA["pdc"]["sensor_1"])
         print("Sensor #2: %d" % DATA["pdc"]["sensor_2"])
         print("Sensor #3: %d" % DATA["pdc"]["sensor_3"])
         print("Sensor #4: %d" % DATA["pdc"]["sensor_4"])
         print("")
+        
+        if DATA["pdc"]["active"]:
+            pdc_display_packet = ibus.cmd.get_pdc_display_packet([DATA["pdc"]["sensor_1"],
+                                                                  DATA["pdc"]["sensor_2"],
+                                                                  DATA["pdc"]["sensor_3"],
+                                                                  DATA["pdc"]["sensor_4"]])
+            ibus.send(pdc_display_packet.raw)
 
 def onPlayerChanged(event_data):
     global DATA
@@ -402,7 +419,7 @@ def main():
     except:
         print("Unable to run the gobject main loop")
     
-    print('')
+    print("")
     shutdown()
     sys.exit(0)
     
