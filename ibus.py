@@ -2,6 +2,7 @@
 
 import sys
 import time
+import math
 import datetime
 import socket
 import struct
@@ -320,6 +321,10 @@ class IBUSCommands(object):
             str = str[:RADIO_DISPLAY_SIZE]
             length = len(str) + 5
             data = str.encode("hex")
+        elif state == "reverse":
+            str = str[:RADIO_DISPLAY_SIZE*2]
+            length = (len(str)/2) + 5
+            data = str
         else:
             str = str[:RADIO_DISPLAY_SIZE-2]
             length = len(str) + 7
@@ -371,6 +376,16 @@ class IBUSCommands(object):
 
     def print_stopped(self):
         return self._print_stop.isSet()
+    
+    def get_pdc_display_packet(self, data):
+        hex_str = ""
+        for i in range(0, 12):
+            value_index = int(math.modf(i/3)[1])        
+            value = int(math.modf(data[value_index]/37)[1]) + 2
+            hex_str += "b" + str(value)
+
+        packet = self.get_display_packet(hex_str, "reverse")
+        return packet
     
     def volume_down(self):
         for i in range(0, 5):

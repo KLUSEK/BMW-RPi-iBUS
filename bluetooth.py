@@ -175,17 +175,9 @@ class BluetoothService(object):
         else:
             return False
         
-    def disconnect(self):
-        if os.path.isfile(LAST_DEVICE) and os.path.getsize(LAST_DEVICE) > 0:
-            try:
-                last_device = open(LAST_DEVICE).read()
-            except Exception as error:
-                return False
-            
-            device = bluezutils.find_device(last_device)
-            return bluezutils.dev_disconnect(device.object_path)
-        else:
-            return False
+    def disconnect(self, adapter):
+        device = bluezutils.find_device(adapter)
+        return bluezutils.dev_disconnect(device.object_path)
 
     def shutdown(self):
         self.manager.UnregisterAgent(self.path)
