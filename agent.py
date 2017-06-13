@@ -91,6 +91,7 @@ def onIBUSready():
     ibus.cmd.request_for_limit()
     ibus.cmd.request_for_sensors()
     ibus.cmd.request_for_radio_status()
+    ibus.cmd.request_for_vin()
 
 def onBluetoothConnected(state, adapter=None):
     global ibus
@@ -198,6 +199,9 @@ def onIBUSpacket(packet):
 
     if packet.raw == "5003c8019a":
         print("### Pressed: R/T button")
+
+        ibus.cmd.request_for_fuel_1()
+        ibus.cmd.request_for_fuel_2()
 
         ibus.cmd.request_for_radio_status()
         ibus.cmd.set_clock()
