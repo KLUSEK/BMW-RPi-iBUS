@@ -25,7 +25,7 @@ class IBUSService(object):
     parity = serial.PARITY_EVEN
     stopbits = serial.STOPBITS_ONE
     rtscts = True
-    timeout = .1
+    timeout = .2
     writeTimeout = 0
     _handle = None
 
@@ -135,6 +135,7 @@ class IBUSService(object):
                 # confirm full packet exists
                 expected_packet_length = (2 + 2 + 2 + total_length_hex_chars + 2)
                 if current_packet.__len__() != expected_packet_length:
+                    print("Unexpected packet length. Dump: %s" % hex_dump)
                     continue
 
                 # create packet
@@ -161,10 +162,6 @@ class IBUSService(object):
         Process packets []
         """
         while index < len(packets):
-            # print details of received packet
-            # print(packets[index])
-            
-            # call the callback
             self.onIBUSpacket_callback(packets[index])
             del(packets[index])
 
@@ -246,6 +243,7 @@ class IBUSPacket(object):
             "46": "Central Information Display",
             "50": "MFL Multi Functional Steering Wheel Buttons",
             "51": "Mirror Memory",
+            "57": "Steering Angle Sensor",
             "5B": "Integrated Heating And Air Conditioning",
             "60": "PDC Park Distance Control",
             "68": "RAD Radio",
@@ -377,11 +375,20 @@ class IBUSCommands(object):
     def print_stopped(self):
         return self._print_stop.isSet()
     
+    def reset_display(self):
+        """
+        It is just an empty string sent to display
+        """
+        self.ibus.send("c805802342321e")
+    
     def get_pdc_display_packet(self, data):
         hex_str = ""
         for i in range(0, 12):
-            value_index = int(math.modf(i/3)[1])        
-            value = int(math.modf(data[value_index]/37)[1]) + 2
+            value_index = int(math.modf(i/3)[1])
+
+            # set value in 20-160 boundary for better calibration
+            value = max(20, min(160, data[value_index]))        
+            value = int(math.modf(value/26)[1]) + 2
             hex_str += "b" + str(value)
 
         packet = self.get_display_packet(hex_str, "reverse")
@@ -393,7 +400,7 @@ class IBUSCommands(object):
             time.sleep(0.1)
     
     def volume_up(self):
-        for i in range(0, 5):
+        for i in range(0, 4):
             self.ibus.send("50046832111f")
             time.sleep(0.1)
         
@@ -476,6 +483,7 @@ class IBUSCommands(object):
     def request_for_gong(self):
         """
         IBUS Message: BF 03 80 1a 26
+        But, it doesn't work for me :(
         """
         self.ibus.send("bf03801a26")        
         
@@ -576,3 +584,25 @@ class IBUSCommands(object):
         It turns-on "clown nose" under back mirror for 3 seconds
         """
         self.ibus.send("3f05000c4e0179")
+        
+    def request_light_status(self):
+        """
+        @return D0 08 BF 5B 00 00 00 00 00 3C
+        Contains all information about active lights
+        """
+        self.ibus.send("bf03d05a36")
+
+    def request_lcm_io_status(self):
+        """
+        Or 3F LL D0 0B 00 CK
+        @returns d0233fa01040fefe0006000008ab00000000001e00000b000000000000000000000000008c
+        Details about parsing: https://github.com/kmalinich/node-bmw-client/blob/master/modules/LCM.js
+        """
+        self.ibus.send("3f03d00be7")
+
+    def clear_fault_memory(self, dest):
+        """
+        3F 03 08 05 31	DIA	SHD	Clear fault memory
+        08 03 3F A0 94	SHD	DIA	Diagnostic command acknowledged
+        """
+        pass

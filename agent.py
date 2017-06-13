@@ -10,7 +10,6 @@ except ImportError:
     import gobject as GObject
 import bluetooth as bt_
 import ibus as ibus_
-#import rfcomm as rfcomm_
 
 bluetooth = None
 ibus = None
@@ -52,12 +51,31 @@ DATA = {
     },
     "radio": {
         "active": False
-    }
+    },
+    "lights": {
+        "parking": None,
+        "lowbeam": None,
+        "highbeam": None,
+        "fog_front": None,
+        "fog_rear": None,
+        "turn_left": None,
+        "turn_right": None,
+        "turn-fast": None
+    },
+    "dimmer": None,
+    "io_status": None
 }
 
 def hex2int(v, nbits=7):
     v = int(v, 16)
     return v if v < (1 << nbits) else v - (1 << nbits + 1)
+
+def check_bitmask(xand, bit):
+    return xand & bit and True or False;
+
+def set_bitmask(xor, bit):
+    xor |= bit
+    return xor
 
 def onIBUSready():
     ibus.cmd.clown_nose_on()
@@ -91,8 +109,10 @@ def onBluetoothConnected(state, adapter=None):
         DATA["bluetooth"]["adapter"] = adapter
         packet = ibus.cmd.get_display_packet("BT READY", "connect")
         ibus.send(packet.raw)
-        
+
         time.sleep(1.5)
+
+        # switch to AUX
         ibus.cmd.request_for_radio_mode_switch()
         ibus.cmd.request_for_radio_mode_switch()
     else: # disconnected | reset adapter MAC address and stop RADIO display thread
@@ -101,6 +121,8 @@ def onBluetoothConnected(state, adapter=None):
 
         ibus.send(packet.raw)
         time.sleep(1.5)
+
+        # switch back to FM
         ibus.cmd.request_for_radio_mode_switch()
 
 def onIBUSpacket(packet):
@@ -167,24 +189,21 @@ def onIBUSpacket(packet):
                 print("      -> BT Error")
                 packet = ibus.cmd.get_display_packet("ERROR", "connect")
                 ibus.send(packet.raw)
-            return
         else:
             print("      -> BT Disconnecting")
             packet = ibus.cmd.get_display_packet("DISABLING", "connect")
             ibus.send(packet.raw)
             bluetooth.disconnect(DATA["bluetooth"]["adapter"])
+        return
 
     if packet.raw == "5003c8019a":
         print("### Pressed: R/T button")
 
-        ibus.cmd.clown_nose_on()
-        ibus.cmd.request_for_vin()
-        ibus.cmd.request_for_distance()
-        ibus.cmd.request_for_limit()
-        ibus.cmd.request_for_fuel_1()
-        ibus.cmd.request_for_fuel_2()
         ibus.cmd.request_for_radio_status()
         ibus.cmd.set_clock()
+
+        ibus.cmd.clown_nose_on()
+        return
 
     # split hex string into list of values
     data = []
@@ -198,7 +217,6 @@ def onIBUSpacket(packet):
         except:
             DATA["obc"]["vin"] = None
             print("VIN: unknown")
-        return
 
     """
     OBC (On Board Computer)
@@ -216,7 +234,6 @@ def onIBUSpacket(packet):
         # Ignition status
         if data[0] == "11":
             DATA["obc"]["ignition"] = int(data[1], 16)
-
             print("Ignition state: %d" % DATA["obc"]["ignition"])
         """
         R_Gear detection
@@ -227,45 +244,56 @@ def onIBUSpacket(packet):
             if (int(data[2], 16) >> 4) == 1:
                 # decrease volume while reversing
                 if not DATA["pdc"]["active"]:
+                    ibus.cmd.request_for_pdc()
                     ibus.cmd.volume_down()
-                    if DATA["player"]["state"] == "playing":
-                        print("      -> Pause song")
-                        bluetooth.player_control("pause")
                 DATA["pdc"]["active"] = True
                 print("PDC: active")
             else:
                 # increase volume after reversing
                 if DATA["pdc"]["active"]:
-                    # 3x MODE button to reset display
-                    for i in range(0, 3):
-                        ibus.cmd.request_for_radio_mode_switch()
+                    ibus.cmd.reset_display()
                     ibus.cmd.volume_up()
                 DATA["pdc"]["active"] = False
                 print("PDC: inactive")
         # Mileage
         elif data[0] == "17":
             DATA["obc"]["mileage"] = (int(data[3], 16)*65536) + (int(data[2], 16)*256) + int(data[1], 16)
-            
             print("Mileage: %d (km)" % DATA["obc"]["mileage"])
         # Speed/RPM
         elif data[0] == "18":
             DATA["obc"]["speed"] = int(data[1], 16) * 2
             DATA["obc"]["rpm"] = int(data[2], 16) * 100
-
             print("Speed: %d km/h, RPM: %d" % (DATA["obc"]["speed"], DATA["obc"]["rpm"]))
         # Temperatures
         elif data[0] == "19":
             DATA["obc"]["outside"] = hex2int(data[1])
             DATA["obc"]["coolant"] = hex2int(data[2])
-
             print("Outside: %d (C), Coolant: %d (C)" % (DATA["obc"]["outside"], DATA["obc"]["coolant"]))
-        # Lights status
-        elif data[0] == "5b":
-            print("Light Status:")
-            print(packet.raw)
-
         return
 
+    # Lights status
+    if packet.source_id == "d0" and packet.destination_id == "bf":
+        if data[0] == "5b":
+            hex_value = int(data[1], 16)
+            DATA["lights"]["parking"] = check_bitmask(hex_value, 0x01)
+            DATA["lights"]["lowbeam"] = check_bitmask(hex_value, 0x02)
+            DATA["lights"]["highbeam"] = check_bitmask(hex_value, 0x04)
+            DATA["lights"]["fog_front"] = check_bitmask(hex_value, 0x08)
+            DATA["lights"]["fog_rear"] = check_bitmask(hex_value, 0x10)
+            DATA["lights"]["turn_left"] = check_bitmask(hex_value, 0x20)
+            DATA["lights"]["turn_right"] = check_bitmask(hex_value, 0x40)
+            DATA["lights"]["turn-fast"] = check_bitmask(hex_value, 0x80)
+            return
+        
+        if data[0] == "5c":
+            DATA["dimmer"] = int(data[1], 16)
+            return
+
+    if packet.source_id == "d0" and packet.destination_id == "3f":
+        if data[0] == "a0":
+            DATA["io_status"] = packet.raw
+            return  
+    
     """
     * Handle OBC messages sent from IKE
     * IBus Message: 80 0C FF 24 <System> 00 <Data> <CRC>
@@ -312,7 +340,6 @@ def onIBUSpacket(packet):
                 print("AVG speed: %f" % DATA["obc"]["avg_speed"])
             except:
                 DATA["obc"]["avg_speed"] = None
-            
         return
     
     """
@@ -321,8 +348,7 @@ def onIBUSpacket(packet):
     if packet.source_id == "68" and packet.destination_id == "3f":
         if packet.length == "0d": 
             DATA["radio"]["active"] = True if data[1] == "31" else False
-            print("Radio active?")
-            print(DATA["radio"]["active"])
+            print("Radio active: %s" % str(DATA["radio"]["active"]))
             return
  
     """
@@ -331,32 +357,34 @@ def onIBUSpacket(packet):
     # Gong status - use it for sending DIAG request for distance
     if packet.source_id == "60" and packet.destination_id == "80" and DATA["pdc"]["active"]:
         ibus.cmd.request_for_pdc()
+        return
 
     # DIAG responce from PDC cointaing information about distance for each sensor
     if packet.source_id == "60" and packet.destination_id == "3f":
-        DATA["pdc"]["sensor_1"] = int(data[2], 16)
-        DATA["pdc"]["sensor_2"] = int(data[4], 16)
-        DATA["pdc"]["sensor_3"] = int(data[5], 16)
-        DATA["pdc"]["sensor_4"] = int(data[3], 16)
-
-        print("Sensor #1: %d" % DATA["pdc"]["sensor_1"])
-        print("Sensor #2: %d" % DATA["pdc"]["sensor_2"])
-        print("Sensor #3: %d" % DATA["pdc"]["sensor_3"])
-        print("Sensor #4: %d" % DATA["pdc"]["sensor_4"])
-        print("")
-        
         if DATA["pdc"]["active"]:
+            DATA["pdc"]["sensor_1"] = int(data[2], 16)
+            DATA["pdc"]["sensor_2"] = int(data[4], 16)
+            DATA["pdc"]["sensor_3"] = int(data[5], 16)
+            DATA["pdc"]["sensor_4"] = int(data[3], 16)
+
+            print("Sensor #1: %d" % DATA["pdc"]["sensor_1"])
+            print("Sensor #2: %d" % DATA["pdc"]["sensor_2"])
+            print("Sensor #3: %d" % DATA["pdc"]["sensor_3"])
+            print("Sensor #4: %d" % DATA["pdc"]["sensor_4"])
+            print("")
+
             pdc_display_packet = ibus.cmd.get_pdc_display_packet([DATA["pdc"]["sensor_1"],
                                                                   DATA["pdc"]["sensor_2"],
                                                                   DATA["pdc"]["sensor_3"],
                                                                   DATA["pdc"]["sensor_4"]])
             ibus.send(pdc_display_packet.raw)
+            return
 
 def onPlayerChanged(event_data):
     global DATA
 
     """
-    Wait untill all data is set
+    Wait until all data is set
     to avoid sending crap to CDP display
     """
     if ibus.handle is None or \

@@ -1,0 +1,35 @@
+===== INDICATORS
+
+3F 0B D0 0C 00 00 00 00 00 00 00 06 CK
+                        80 		- right (side) indicator
+                        40 		- right front indicator
+			20 		- left front indicator
+			      80 	- right rear idndicator / RIGHT SIDE MARKER + RIGHT REAR FASHER (STAY LIT)
+			      20 	- left rear indicator  / LEFT SIDE MARKER + LEFT REAR FLASHER (STAY LIT)
+			      04 	- left (side) indicator 
+
+
+3F 0B D0 0C 00 00 00 00 20 00 24 06 EA  - left indicators (all 3 at once)
+3F 0B D0 0C 00 00 00 00 C0 00 00 06 2E  - right indicators (all 3 at once)
+
+
+===== STOP LIGHTS
+
+3F 0B D0 0C 00 00 00 00 00 00 00 06 CK
+               10 			- stop lights (all 3)
+		        10 		- right stop light (inner)
+			08		- left stop light (inner)
+			04 		- left stop light (outer)
+			01 		- center stop light
+ 			   01   	- right stop light (outer)
+
+3F 0B D0 0C 00 00 00 00 18 00 00 06 F6  - right inner + left inner
+3F 0B D0 0C 00 00 00 00 04 01 00 06 EB  - right outer + left outer
+3F 0B D0 0C 00 00 00 00 14 00 00 06 FA  - right inner + left outer
+3F 0B D0 0C 00 00 00 00 08 01 00 06 E7  - right outer + left inner
+
+===== FRONT LIGHTS
+
+3F 0B D0 0C 00 00 00 00 00 00 00 06 CK
+			      40 - przeslony xenon
+			

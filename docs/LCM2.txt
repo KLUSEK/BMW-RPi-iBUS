@@ -1,0 +1,67 @@
+1st byte
+
+20 - awaryjne
+10 - tylne przeciwmgielne kontrolka
+01 - mijania
+
+
+2nd byte
+
+10 - swiatla stop (wszystkie 3)
+08 - tylne przecimgielne + kontrolka
+04 - przednie przecimgielne + kontrolka 
+01 - mijania przod tyl i dzienne
+02 - mijania bez dziennych
+
+3rd byte
+80 - dlugie halogeny + kontrolka
+40 - przednie przeciwmgielne + kontrolka
+
+4rd byte
+
+80 - prawy kierunkowskaz
+40 - lewy kierunek
+10 - tylne przeciwgielne
+01 - mijania
+
+5th byte
+
+80 - boczny kierunke prawy + akurator
+40 - kierunek przedni prawy (swieci ciagle)
+20 - kierunek przedni lewy (swieci ciagle)
+10 - prawy stop
+08 - lewy stop
+04 - lewy stop (obwodka)
+01 - srodkowy stop
+
+6th byte
+40 - left tyl mijania
+20 - prawy dlugie halogen i mijania
+10 - lewy dlugi halogen i mijania
+08 - tailling left
+04 - mijania lewy xenon
+02 - mijania prawy xenon
+02 - mijania prawy
+01 - prawy stop obwodka
+
+7th byte
+
+80 - prawy kierunek tylny (swieci ciagle)
+40 - dlugie xenon - podnosi preslone nie zapala
+20 - lewy tylny kierunek (swieci ciagle)
+10 - tylne przecimgielne z kontrolka (na pare sek)
+
+04 - lewy boczny kierunek swieci
+
+3f 0b bf 0c 00 00 00 00 00 00 00 06 ck - rribus
+3F 0C D0 0C 00 00 00 00 21 20 00 00 00 EE - forum
+3F 0B D0 0C 00 00 00 40 00 00 00 06 ck - drive
+
+1000 0000 = 0x80
+0100 0000 = 0x40
+0010 0000 = 0x20
+0001 0000 = 0x10
+0000 1000 = 0x08
+0000 0100 = 0x04
+0000 0010 = 0x02
+0000 0001 = 0x01
