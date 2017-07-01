@@ -50,7 +50,8 @@ DATA = {
         "sensor_4": None
     },
     "radio": {
-        "active": False
+        "active": False,
+        "to_resume": False
     },
     "lights": {
         "parking": None,
@@ -200,13 +201,12 @@ def onIBUSpacket(packet):
     if packet.raw == "5003c8019a":
         print("### Pressed: R/T button")
 
+        ibus.cmd.clown_nose_on()
         ibus.cmd.request_for_fuel_1()
         ibus.cmd.request_for_fuel_2()
 
         ibus.cmd.request_for_radio_status()
         ibus.cmd.set_clock()
-
-        ibus.cmd.clown_nose_on()
         return
 
     # split hex string into list of values
@@ -237,8 +237,14 @@ def onIBUSpacket(packet):
     if packet.source_id == "80" and packet.destination_id == "bf":
         # Ignition status
         if data[0] == "11":
+            if int(data[1], 16) == 0:
+                if DATA["obc"]["ignition"] > int(data[1], 16) and DATA["bluetooth"]["connected"]:
+                    bluetooth.disconnect(DATA["bluetooth"]["adapter"])
+
+            # set new ignition state
             DATA["obc"]["ignition"] = int(data[1], 16)
             print("Ignition state: %d" % DATA["obc"]["ignition"])
+            return
         """
         R_Gear detection
         80 0A BF 13 02 10 00 00 00 00 38 CK // in reverse
@@ -250,12 +256,21 @@ def onIBUSpacket(packet):
                 if not DATA["pdc"]["active"]:
                     ibus.cmd.request_for_pdc()
                     ibus.cmd.volume_down()
+                    if DATA["bluetooth"]["connected"]:
+                        if DATA["player"]["state"] == "playing":
+                            bluetooth.player_control("pause")
+                            DATA["radio"]["to_resume"] = True
+                        else:
+                            DATA["radio"]["to_resume"] = False
                 DATA["pdc"]["active"] = True
                 print("PDC: active")
             else:
                 # increase volume after reversing
                 if DATA["pdc"]["active"]:
-                    ibus.cmd.reset_display()
+                    ibus.cmd.reset_display()       
+                    if DATA["bluetooth"]["connected"] and DATA["radio"]["to_resume"]:
+                        bluetooth.player_control("play")
+                        DATA["radio"]["to_resume"] = False
                     ibus.cmd.volume_up()
                 DATA["pdc"]["active"] = False
                 print("PDC: inactive")

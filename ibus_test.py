@@ -18,22 +18,7 @@ def onIBUSready():
 
 def onIBUSpacket(packet):
     
-    if packet.raw == "5003c8019a":
-        print("### Pressed: R/T button")
-
-        ibus.cmd.request_light_status()
-#        self.ibus.send("3f03d00be7")
-#        self.ibus.send("3f03d000ec")
-
-#    print packet
-
-    # split hex string into list of values
-    data = []
-    data = [packet.data[i:i+2] for i in range(0, len(packet.data), 2)]
-    
-    if packet.source_id == "d0" and packet.destination_id == "bf":
-        if data[0] == "5b":
-            print("Lights status: " + packet.raw)
+    print(packet)
 
 def main():
     global ibus

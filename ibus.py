@@ -67,7 +67,10 @@ class IBUSService(object):
         """
         while not self.stopped():
             if (self.handle.inWaiting() >= 5):
-                data = self.handle.read(9999)
+                try:
+                    data = self.handle.read(9999)
+                except:
+                    continue
                 self.process_bus_dump(data)
 
     def stop(self):
@@ -599,6 +602,13 @@ class IBUSCommands(object):
         Details about parsing: https://github.com/kmalinich/node-bmw-client/blob/master/modules/LCM.js
         """
         self.ibus.send("3f03d00be7")
+
+    def reset_rpa(self):
+        """
+        Reset RPA status icon on IKE
+        @returns: 80 0a bf 13 02 00 00 00 00 00 18 3c
+        """
+        self.ibus.send("5b0580838000dd")
 
     def clear_fault_memory(self, dest):
         """
