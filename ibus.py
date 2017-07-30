@@ -247,7 +247,7 @@ class IBUSPacket(object):
             "50": "MFL Multi Functional Steering Wheel Buttons",
             "51": "Mirror Memory",
             "57": "Steering Angle Sensor",
-            "5B": "Integrated Heating And Air Conditioning",
+            "5b": "Integrated Heating And Air Conditioning",
             "60": "PDC Park Distance Control",
             "68": "RAD Radio",
             "6a": "DSP Digital Sound Processor",
@@ -540,7 +540,7 @@ class IBUSCommands(object):
         """
         self.ibus.send("3f03601b47")
         
-    def set_speed_limit(speed):
+    def set_speed_limit(self, speed):
         """
         3b 06 80 40 09 00 xx CK - speed limits set (audio signal with exceeding)
         3b 05 80 41 09 20 CK    - speed limits on current speed set
@@ -551,7 +551,7 @@ class IBUSCommands(object):
                             data="400900" + "{:02x}".format(speed))
         self.ibus.send(packet.raw)
         
-    def reset_speed_limit():
+    def reset_speed_limit(self):
         """
         3b 05 80 41 09 08 fe - deactivate adjusted speed limit
         """
@@ -602,13 +602,6 @@ class IBUSCommands(object):
         Details about parsing: https://github.com/kmalinich/node-bmw-client/blob/master/modules/LCM.js
         """
         self.ibus.send("3f03d00be7")
-
-    def reset_rpa(self):
-        """
-        Reset RPA status icon on IKE
-        @returns: 80 0a bf 13 02 00 00 00 00 00 18 3c
-        """
-        self.ibus.send("5b0580838000dd")
 
     def clear_fault_memory(self, dest):
         """

@@ -136,10 +136,13 @@ def onIBUSpacket(packet):
     50 04 68 32 11 1F - Volume Up button pressed
     50 04 68 3B 08 0F - Previous button pressed once
     50 04 68 3B 18 1F - Previous button (long press)
-    50 04 68 3B 21 26 - Next button pressed once
+    50 04 68 3B 28 2f - Previous button released 
+    50 04 68 3B 01 06 - Next button pressed once
     50 04 68 3B 11 16 - Next button (long press)
+    50 04 68 3B 21 26 - Next button released
     50 04 C8 3B 80 27 - DIAL button
     50 04 C8 3B 90 37 - DIAL button (long press)
+    50 04 C8 3B a0 07 - DIAL button released
     50 03 C8 01 9A    - R/T button
     """
     if packet.raw == "5004683b080f":
@@ -156,7 +159,7 @@ def onIBUSpacket(packet):
             bluetooth.player_control("rewind")
             return
 
-    if packet.raw == "5004683b2126":
+    if packet.raw == "5004683b0106":
         print("### Pressed: Next button")
         if DATA["bluetooth"]["connected"]:
             print("      -> Next song")
@@ -202,11 +205,7 @@ def onIBUSpacket(packet):
         print("### Pressed: R/T button")
 
         ibus.cmd.clown_nose_on()
-        ibus.cmd.request_for_fuel_1()
-        ibus.cmd.request_for_fuel_2()
-
-        ibus.cmd.request_for_radio_status()
-        ibus.cmd.set_clock()
+        ibus.cmd.set_clock()        
         return
 
     # split hex string into list of values
