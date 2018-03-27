@@ -93,6 +93,7 @@ class BluetoothService(object):
             print("Device %s connected" % bt_addr)
             print("==================================")
 
+            os.system("pactl set-sink-volume 0 153%%")
             self.onBluetoothConnected_callback(True, bt_addr)
 
             try:

@@ -39,8 +39,7 @@ DATA = {
         "fuel_1": None,
         "fuel_2": None,
         "range": None,
-        "avg_speed": None,
-        "lights": False
+        "avg_speed": None
     },
     "pdc": {
         "active": False,
