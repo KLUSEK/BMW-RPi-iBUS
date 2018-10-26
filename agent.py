@@ -4,23 +4,23 @@ import os
 import sys
 import time
 import threading
+from Queue import Queue
 try:
     from gi.repository import GObject
 except ImportError:
     import gobject as GObject
-import bluetooth as bt_
 import ibus as ibus_
+import bluetooth as bt_
+import mqtt as mqtt_
 
 bluetooth = None
 ibus = None
+mqtt = None
 
 DATA = {
     "bluetooth": {
         "adapter": None,
-        "connected": False,
-    },
-    "rfcomm": {
-        "connected": False 
+        "connected": False
     },
     "player": {
         "state": None,
@@ -36,6 +36,7 @@ DATA = {
         "outside": None,
         "coolant": None,
         "mileage": None,
+        "distance": None,
         "fuel_1": None,
         "fuel_2": None,
         "range": None,
@@ -128,6 +129,7 @@ def onBluetoothConnected(state, adapter=None):
 
 def onIBUSpacket(packet):
     global DATA
+    global queue
 
     """
     MFL Multi Functional Steering Wheel Buttons:
@@ -204,7 +206,16 @@ def onIBUSpacket(packet):
         print("### Pressed: R/T button")
 
         ibus.cmd.clown_nose_on()
-        ibus.cmd.set_clock()        
+
+        packet = ibus.cmd.get_display_packet("OPEN GARAGE")
+        ibus.send(packet.raw)
+        
+        pwd = os.path.dirname(os.path.realpath(sys.argv[0]))
+        os.system("%s/radio-transmitter" % pwd)
+
+        ibus.cmd.reset_display()
+        ibus.cmd.set_clock()
+
         return
 
     # split hex string into list of values
@@ -306,11 +317,12 @@ def onIBUSpacket(packet):
             DATA["dimmer"] = int(data[1], 16)
             return
 
-    if packet.source_id == "d0" and packet.destination_id == "3f":
+#    if packet.source_id == "d0" and packet.destination_id == "3f":
+    if packet.source_id == "d0":
         if data[0] == "a0":
             DATA["io_status"] = packet.raw
-            return  
-    
+            return
+
     """
     * Handle OBC messages sent from IKE
     * IBus Message: 80 0C FF 24 <System> 00 <Data> <CRC>
@@ -336,18 +348,22 @@ def onIBUSpacket(packet):
         # Range
         elif data[1] == "06":
             try:
-                DATA["obc"]["range"] = float(packet.data[4:14].lstrip("00").decode("hex"))
-                print("Range: %f" % DATA["obc"]["range"])
+                DATA["obc"]["range"] = int(packet.data[4:14].lstrip("00").decode("hex"))
+                print("Range: %i" % DATA["obc"]["range"])
             except:
                 DATA["obc"]["range"] = None
-        # Distance
+        # Distance // actualy I've never got it working in my E46 :|
         elif data[1] == "07":
-            print("Distance: %s" % packet.raw)
+            try:
+                DATA["obc"]["distance"] = int(packet.data[4:14].lstrip("00").decode("hex"))
+                print("Distance: %i" % DATA["obc"]["distance"])
+            except:
+                DATA["obc"]["distance"] = None
         # Speed limit
         elif data[1] == "09":
             try:
-                DATA["obc"]["limit"] = float(packet.data[4:14].lstrip("00").decode("hex"))
-                print("Limit: %f" % DATA["obc"]["limit"])
+                DATA["obc"]["limit"] = int(packet.data[4:14].lstrip("00").decode("hex"))
+                print("Speed limit: %i" % DATA["obc"]["limit"])
             except:
                 DATA["obc"]["limit"] = None
         # AVG speed
@@ -396,6 +412,12 @@ def onIBUSpacket(packet):
                                                                   DATA["pdc"]["sensor_4"]])
             ibus.send(pdc_display_packet.raw)
             return
+
+    # clear all waiting items
+    with queue.mutex:
+        queue.queue.clear()
+    # propagate to MQTT
+    queue.put(DATA["obc"], False)
 
 def onPlayerChanged(event_data):
     global DATA
@@ -446,6 +468,10 @@ def onPlayerChanged(event_data):
 def main():
     global bluetooth
     global ibus
+    global mqtt
+
+    global queue
+    queue = Queue(maxsize=1)
 
     bluetooth = bt_.BluetoothService(onBluetoothConnected, onPlayerChanged)
 
@@ -455,6 +481,11 @@ def main():
     ibus.main_thread = threading.Thread(target=ibus.start)
     ibus.main_thread.daemon = True
     ibus.main_thread.start()
+
+    mqtt = mqtt_.MQTTService()
+    mqtt.main_thread = threading.Thread(target=mqtt.start, args=(queue,))
+    mqtt.main_thread.daemon = True
+    mqtt.main_thread.start()
 
     try:
         mainloop = GObject.MainLoop()
@@ -471,6 +502,9 @@ def main():
 def shutdown():
     global bluetooth
     global ibus
+    global mqtt
+
+    global queue
     
     try:
         print("Stopping RADIO display thread...")
@@ -484,9 +518,16 @@ def shutdown():
         print("Stopping IBUS main thread...")
         ibus.stop()
 
+    if mqtt.main_thread.isAlive():
+        print("Stopping MQTT main thread...")
+        mqtt.stop()
+
     print("Destroying IBUS service...")
     ibus.shutdown()
+    print("Destroying Bluetooth service...")
     bluetooth.shutdown()
+    print("Destroying MQTT service...")
+    mqtt.shutdown()
 
 if __name__ == '__main__':
     main()

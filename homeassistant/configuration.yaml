@@ -1,0 +1,20 @@
+
+mqtt:
+  password: ******
+  embedded:
+
+
+sensor:
+  - platform: mqtt
+    state_topic: 'car/bmw/raspberry'
+    name: 'BMW E46 Raspberry device'
+    expire_after: 10
+    json_attributes:
+      - mileage
+      - avg_speed
+      - range
+      - fuel_consumption_1
+      - fuel_consumption_2
+      - outside_temp
+      - coolant_temp
+      - speed_limit
